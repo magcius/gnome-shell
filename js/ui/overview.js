@@ -166,6 +166,7 @@ Overview.prototype = {
         this.viewSelector.addSearchProvider(new AppDisplay.PrefsSearchProvider());
         this.viewSelector.addSearchProvider(new PlaceDisplay.PlaceSearchProvider());
         this.viewSelector.addSearchProvider(new DocDisplay.DocSearchProvider());
+        this.viewSelector.addSearchProvider(new WorkspacesView.WindowSearchProvider());
 
         // TODO - recalculate everything when desktop size changes
         this.dash = new Dash.Dash();
