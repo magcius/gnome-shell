@@ -91,13 +91,13 @@ function WindowClone(realWindow) {
 
 WindowClone.prototype = {
     _init : function(realWindow) {
-        this.actor = new St.BoxLayout({ style_class: 'window-clone',
+        this.boxActor = new St.BoxLayout({ style_class: 'window-clone',
                                         track_hover: true,
                                         reactive: true,
                                         vertical: true,
                                         x: realWindow.x,
                                         y: realWindow.y });
-        this.actor._delegate = this;
+        this.boxActor._delegate = this;
 
         this.realWindow = realWindow;
         this.metaWindow = realWindow.meta_window;
@@ -113,12 +113,13 @@ WindowClone.prototype = {
         this._topRow.add(this._titleLabel, { expand: true });
         this._topRow.add(this._closeButton);
 
-        this._windowClone = new Clutter.Clone({ source: realWindow.get_texture() });
+        this.actor = new Clutter.Clone({ source: realWindow.get_texture() });
+        this.actor._delegate = this;
 
-        this.actor.add(this._topRow, { y_align: St.Align.MIDDLE,
-                                       y_fill: true });
+        this.boxActor.add(this._topRow, { y_align: St.Align.MIDDLE,
+                                          y_fill: true });
 
-        this.actor.add(this._windowClone);
+        this.boxActor.add(this.actor);
 
         this._stackAbove = null;
 
@@ -133,17 +134,17 @@ WindowClone.prototype = {
         this._realWindowDestroyId = this.realWindow.connect('destroy',
             Lang.bind(this, this._disconnectRealWindowSignals));
 
-        this.actor.connect('button-release-event',
+        this.boxActor.connect('button-release-event',
                            Lang.bind(this, this._onButtonRelease));
 
-        this.actor.connect('scroll-event',
+        this.boxActor.connect('scroll-event',
                            Lang.bind(this, this._onScroll));
 
-        this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
-        this.actor.connect('leave-event',
+        this.boxActor.connect('destroy', Lang.bind(this, this._onDestroy));
+        this.boxActor.connect('leave-event',
                            Lang.bind(this, this._onLeave));
 
-        this._draggable = DND.makeDraggable(this.actor,
+        this._draggable = DND.makeDraggable(this.boxActor,
                                             { restoreOnSuccess: true,
                                               dragActorMaxSize: WINDOW_DND_SIZE,
                                               dragActorOpacity: DRAGGING_WINDOW_OPACITY });
@@ -157,8 +158,8 @@ WindowClone.prototype = {
     },
 
     getClonePosition: function () {
-        return [this.origX - this._windowClone.x,
-                this.origY - this._windowClone.y];
+        return [this.origX - this.actor.x,
+                this.origY - this.actor.y];
     },
 
     setStackAbove: function (actor) {
@@ -167,9 +168,9 @@ WindowClone.prototype = {
             // We'll fix up the stack after the drag/zooming
             return;
         if (this._stackAbove == null)
-            this.actor.lower_bottom();
+            this.boxActor.lower_bottom();
         else
-            this.actor.raise(this._stackAbove);
+            this.boxActor.raise(this._stackAbove);
     },
 
     destroy: function () {
@@ -197,6 +198,7 @@ WindowClone.prototype = {
 
         if (this._realWindowDestroyId > 0)
             this.realWindow.disconnect(this._realWindowDestroyId);
+
         this._realWindowDestroyId = 0;
     },
 
@@ -204,7 +206,13 @@ WindowClone.prototype = {
         this._disconnectRealWindowSignals();
 
         this.metaWindow._delegate = null;
-        this.actor._delegate = null;
+        this.boxActor._delegate = null;
+
+        if (this._updateCaptionId > 0)
+            this.metaWindow.disconnect(this._updateCaptionId);
+
+        this._updateCaptionId = 0;
+
         if (this._zoomLightbox)
             this._zoomLightbox.destroy();
 
@@ -268,13 +276,13 @@ WindowClone.prototype = {
         this._zoomGlobalOrig.setPosition.apply(this._zoomGlobalOrig, this.actor.get_transformed_position());
         this._zoomGlobalOrig.setScale(width / this.actor.width, height / this.actor.height);
 
-        this.actor.reparent(global.stage);
+        this.boxActor.reparent(global.stage);
         this._zoomLightbox.highlight(this.actor);
 
         [this.actor.x, this.actor.y]             = this._zoomGlobalOrig.getPosition();
         [this.actor.scale_x, this.actor.scale_y] = this._zoomGlobalOrig.getScale();
 
-        this.actor.raise_top();
+        this.boxActor.raise_top();
 
         this._zoomTarget = new ScaledPoint(0, 0, 1.0, 1.0);
         this._zoomTarget.setPosition(this.actor.x - (this.actor.width - width) / 2, this.actor.y - (this.actor.height - height) / 2);
@@ -287,15 +295,15 @@ WindowClone.prototype = {
         this._zooming = false;
         this.emit('zoom-end');
 
-        this.actor.reparent(this._origParent);
+        this.boxActor.reparent(this._origParent);
         if (this._stackAbove == null)
-            this.actor.lower_bottom();
+            this.boxActor.lower_bottom();
         // If the workspace has been destroyed while we were reparented to
         // the stage, _stackAbove will be unparented and we can't raise our
         // actor above it - as we are bound to be destroyed anyway in that
         // case, we can skip that step
         else if (this._stackAbove.get_parent())
-            this.actor.raise(this._stackAbove);
+            this.boxActor.raise(this._stackAbove);
 
         [this.actor.x, this.actor.y]             = this._zoomLocalOrig.getPosition();
         [this.actor.scale_x, this.actor.scale_y] = this._zoomLocalOrig.getScale();
@@ -328,9 +336,9 @@ WindowClone.prototype = {
         // with a new one on the target workspace.
         if (this.actor.get_parent() != null) {
             if (this._stackAbove == null)
-                this.actor.lower_bottom();
+                this.boxActor.lower_bottom();
             else
-                this.actor.raise(this._stackAbove);
+                this.boxActor.raise(this._stackAbove);
         }
 
 
@@ -460,7 +468,7 @@ Workspace.prototype = {
         let actor;
         if (metaWindow != null) {
             let clone = this.lookupCloneForMetaWindow(metaWindow);
-            actor = clone.actor;
+            actor = clone.boxActor;
         }
         this._lightbox.highlight(actor);
     },
@@ -507,9 +515,9 @@ Workspace.prototype = {
             let clone = this._windows[i];
 
             if (!this._isCloneVisible(clone))
-                clone.actor.hide();
+                clone.boxActor.hide();
             else
-                clone.actor.show();
+                clone.boxActor.show();
         }
     },
 
@@ -816,7 +824,7 @@ Workspace.prototype = {
                 clone.setStackAbove(null);
             } else {
                 let previousClone = visibleClones[i - 1];
-                clone.setStackAbove(previousClone.actor);
+                clone.setStackAbove(previousClone.boxActor);
             }
         }
     },
@@ -1072,7 +1080,7 @@ Workspace.prototype = {
                           this.positionWindows(0);
                       }));
 
-        this.actor.add_actor(clone.actor);
+        this.actor.add_actor(clone.boxActor);
         this._windows.push(clone);
         return clone;
     },

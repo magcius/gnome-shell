@@ -302,8 +302,6 @@ WorkspacesView.prototype = {
             if (showAnimation) {
                 let params = { x: workspace.x,
                                y: workspace.y,
-                               scale_x: workspace.scale,
-                               scale_y: workspace.scale,
                                opacity: workspace.opacity,
                                time: WORKSPACE_SWITCH_TIME,
                                transition: 'easeOutQuad'
@@ -321,7 +319,6 @@ WorkspacesView.prototype = {
                 }
                 Tweener.addTween(workspace.actor, params);
             } else {
-                workspace.actor.set_scale(workspace.scale, workspace.scale);
                 workspace.actor.set_position(workspace.x, workspace.y);
                 workspace.actor.opacity = workspace.opacity;
                 if (w == 0)
