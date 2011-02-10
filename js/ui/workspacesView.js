@@ -336,7 +336,6 @@ WorkspacesView.prototype = {
 
             workspace.y += dy;
             workspace.actor.show();
-            workspace.hideWindowsOverlays();
 
             if (showAnimation) {
                 Tweener.addTween(workspace.actor,
@@ -358,10 +357,8 @@ WorkspacesView.prototype = {
         for (let w = 0; w < this._workspaces.length; w++) {
             let workspace = this._workspaces[w];
             if (this._animating || this._scrolling) {
-                workspace.hideWindowsOverlays();
                 workspace.actor.show();
             } else {
-                workspace.showWindowsOverlays();
                 if (this._inDrag)
                     workspace.actor.visible = (Math.abs(w - active) <= 1);
                 else

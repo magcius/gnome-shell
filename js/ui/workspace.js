@@ -91,18 +91,41 @@ function WindowClone(realWindow) {
 
 WindowClone.prototype = {
     _init : function(realWindow) {
-        this.actor = new Clutter.Clone({ source: realWindow.get_texture(),
-                                         reactive: true,
-                                         x: realWindow.x,
-                                         y: realWindow.y });
+        this.actor = new St.BoxLayout({ style_class: 'window-clone',
+                                        track_hover: true,
+                                        reactive: true,
+                                        vertical: true,
+                                        x: realWindow.x,
+                                        y: realWindow.y });
         this.actor._delegate = this;
+
         this.realWindow = realWindow;
         this.metaWindow = realWindow.meta_window;
         this.metaWindow._delegate = this;
         this.origX = realWindow.x;
         this.origY = realWindow.y;
 
+        this._topRow = new St.BoxLayout({ style_class: 'window-clone-titlebar' });
+        this._titleLabel = new St.Label({ text: this.metaWindow.title });
+
+        this._closeButton = new St.Label({ text: "(close)" });
+
+        this._topRow.add(this._titleLabel, { expand: true });
+        this._topRow.add(this._closeButton);
+
+        this._windowClone = new Clutter.Clone({ source: realWindow.get_texture() });
+
+        this.actor.add(this._topRow, { y_align: St.Align.MIDDLE,
+                                       y_fill: true });
+
+        this.actor.add(this._windowClone);
+
         this._stackAbove = null;
+
+        this._updateCaptionId = this.metaWindow.connect('notify::title',
+            Lang.bind(this, function(w) {
+                this._titleLabel.text = w.title;
+            }));
 
         this._sizeChangedId = this.realWindow.connect('size-changed', Lang.bind(this, function() {
             this.emit('size-changed');
@@ -131,6 +154,11 @@ WindowClone.prototype = {
         this._windowIsZooming = false;
         this._zooming = false;
         this._selected = false;
+    },
+
+    getClonePosition: function () {
+        return [this.origX - this._windowClone.x,
+                this.origY - this._windowClone.y];
     },
 
     setStackAbove: function (actor) {
@@ -885,13 +913,12 @@ Workspace.prototype = {
      * workspace-relative [x, y, scale] where scale applies
      * to both X and Y directions.
      */
-    _computeWindowRelativeLayout: function(metaWindow, slot) {
+    _computeWindowRelativeLayout: function(clone, metaWindow, slot) {
         let [xCenter, yCenter, fraction] = slot;
         let [x, y, width, height] = this._getSlotRelativeGeometry(slot);
 
         xCenter = xCenter * global.screen_width;
 
-        let rect = metaWindow.get_outer_rect();
         let buttonOuterHeight, captionHeight;
         let buttonOuterWidth = 0;
 
@@ -905,17 +932,17 @@ Workspace.prototype = {
 
         let desiredWidth = global.screen_width * fraction;
         let desiredHeight = global.screen_height * fraction;
-        let scale = Math.min((desiredWidth - buttonOuterWidth) / rect.width,
-                             (desiredHeight - buttonOuterHeight - captionHeight) / rect.height,
+        let scale = Math.min((desiredWidth - buttonOuterWidth) / clone.width,
+                             (desiredHeight - buttonOuterHeight - captionHeight) / clone.height,
                              1.0 / this.scale);
 
-        x = Math.floor(xCenter - 0.5 * scale * rect.width);
+        x = Math.floor(xCenter - 0.5 * scale * clone.width);
 
         // We want to center the window in case we have just one
         if (metaWindow.get_workspace().n_windows == 1)
-            y = Math.floor(yCenter * global.screen_height - 0.5 * scale * rect.height);
+            y = Math.floor(yCenter * global.screen_height - 0.5 * scale * clone.height);
         else
-            y = Math.floor(y + height - rect.height * scale - captionHeight);
+            y = Math.floor(y + height - clone.height * scale - captionHeight);
 
         return [x, y, scale];
     },
@@ -976,7 +1003,7 @@ Workspace.prototype = {
             if (clone.inDrag)
                 continue;
 
-            let [x, y, scale] = this._computeWindowRelativeLayout(metaWindow, slot);
+            let [x, y, scale] = this._computeWindowRelativeLayout(clone.actor, metaWindow, slot);
 
             if (overlay)
                 overlay.hide();
@@ -1246,9 +1273,9 @@ Workspace.prototype = {
             clone.zoomFromOverview();
 
             if (clone.metaWindow.showing_on_its_workspace()) {
+                let [cx, cy] = clone.getClonePosition();
                 Tweener.addTween(clone.actor,
-                                 { x: clone.origX,
-                                   y: clone.origY,
+                                 { x: cx, y: cy,
                                    scale_x: 1.0,
                                    scale_y: 1.0,
                                    workspace_relative: this,
