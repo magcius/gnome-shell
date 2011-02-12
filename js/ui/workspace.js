@@ -114,12 +114,11 @@ WindowClone.prototype = {
         this._topRow.add(this._closeButton);
 
         this.actor = new Clutter.Clone({ source: realWindow.get_texture() });
-        this.actor._delegate = this;
 
         this.boxActor.add(this._topRow, { y_align: St.Align.MIDDLE,
                                           y_fill: true });
 
-        this.boxActor.add(this.actor);
+        this.boxActor.add(this.actor, {});
 
         this._stackAbove = null;
 
