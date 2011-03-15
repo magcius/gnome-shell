@@ -651,11 +651,20 @@ ChatNotification.prototype = {
         styles = styles || [];
         styles.push(message.direction);
 
+        let input = message.text;
         if (message.messageType == Tp.ChannelTextMessageType.ACTION) {
             let senderAlias = GLib.markup_escape_text(message.sender, -1);
             messageBody = '<i>%s</i> %s'.format(senderAlias, messageBody);
             styles.push('chat-action');
+
+            input = "/me " + input;
         }
+
+        // We need to do this in here, and not in entryActivated if we
+        // want log messages and lines from other clients to be appended
+        // to the input history.
+        if (message.direction == NotificationDirection.SENT)
+            this._inputHistory.addItem(input);
 
         if (message.direction == NotificationDirection.RECEIVED) {
             this.update(this.source.title, messageBody, { customContent: true,
@@ -797,8 +806,6 @@ ChatNotification.prototype = {
         let text = this._responseEntry.get_text();
         if (text == '')
             return;
-
-        this._inputHistory.addItem(text);
 
         // Telepathy sends out the Sent signal for us.
         // see Source._messageSent
