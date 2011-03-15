@@ -21,9 +21,6 @@ const SCROLLBACK_RECENT_TIME = 15 * 60; // 15 minutes
 const SCROLLBACK_RECENT_LENGTH = 20;
 const SCROLLBACK_IDLE_LENGTH = 5;
 
-// See Source._displayPendingMessages
-const SCROLLBACK_HISTORY_LINES = 10;
-
 // See Notification._onEntryChanged
 const COMPOSING_STOP_TIMEOUT = 5;
 
@@ -405,7 +402,7 @@ ChatSource.prototype = {
         let entity = Tpl.Entity.new_from_tp_contact(this._contact, Tpl.EntityType.CONTACT);
         Shell.get_contact_events(logManager,
                                  this._account, entity,
-                                 SCROLLBACK_HISTORY_LINES,
+                                 SCROLLBACK_RECENT_LENGTH,
                                  Lang.bind(this, this._displayPendingMessages));
     },
 
