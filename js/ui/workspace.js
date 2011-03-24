@@ -248,7 +248,7 @@ WindowClone.prototype = {
         this._zoomGlobalOrig.setPosition.apply(this._zoomGlobalOrig, this.actor.get_transformed_position());
         this._zoomGlobalOrig.setScale(width / this.actor.width, height / this.actor.height);
 
-        this.actor.reparent(global.stage);
+        this.actor.reparent(Main.uiGroup);
         this._zoomLightbox.highlight(this.actor);
 
         [this.actor.x, this.actor.y]             = this._zoomGlobalOrig.getPosition();
