@@ -23,7 +23,7 @@ let box = new St.BoxLayout({ vertical: true,
                                     + 'spacing: 20px;' });
 scroll.add_actor(box);
 
-function addTestCase(radii, useGradient) {
+function addTestCase(radii, useGradient, size) {
     let background;
     if (useGradient)
         background = 'background-gradient-direction: vertical;'
@@ -32,10 +32,18 @@ function addTestCase(radii, useGradient) {
     else
         background = 'background: white;';
 
+    let style = 'border: 1px solid black; '
+              + 'border-radius: ' + radii + ';'
+              + 'padding: 5px;'
+              + background;
+
+    if (size !== undefined) {
+        style += 'width: ' + size + ';';
+        style += 'height: ' + size + ';';
+    }
+
     box.add(new St.Label({ text: "border-radius:  " + radii + ";",
-                           style: 'border: 1px solid black; '
-                                  + 'border-radius: ' + radii + ';'
-                                  + 'padding: 5px;' + background }),
+                           style: style }),
                          { x_fill: false });
 }
 
@@ -50,6 +58,21 @@ addTestCase(" 0px  5px 10px 15px", true);
 addTestCase(" 5px 10px 15px  0px", true);
 addTestCase("10px 15px  0px  5px", true);
 addTestCase("15px  0px  5px 10px", true);
+
+// radius clamping
+addTestCase("200px 200px 200px 200px", false, "400px");
+addTestCase("200px 200px 0px 200px",   false, "400px");
+addTestCase("100px 200px 400px 800px", false, "400px");
+addTestCase("800px 400px 200px 100px", false, "400px");
+
+// radius clamping w/ gradient
+addTestCase("200px 200px 200px 200px", true, "400px");
+addTestCase("200px 200px 0px 200px",   true, "400px");
+addTestCase("100px 200px 400px 800px", true, "400px");
+
+// no borders
+addTestCase("0px 0px 0px 0px", false, "500px");
+addTestCase("0px 0px 0px 0px", true,  "500px");
 
 stage.show();
 Clutter.main();
