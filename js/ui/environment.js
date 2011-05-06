@@ -21,13 +21,20 @@ const St = imports.gi.St;
 // "monkey patch" in some varargs ClutterContainer methods; we need
 // to do this per-container class since there is no representation
 // of interfaces in Javascript
-function _patchContainerClass(containerClass) {
+function _patchContainerClass(containerClass, hasLayoutManager) {
     // This one is a straightforward mapping of the C method
-    containerClass.prototype.child_set = function(actor, props) {
-        let meta = this.get_child_meta(actor);
-        for (let prop in props)
-            meta[prop] = props[prop];
-    };
+    if (hasLayoutManager)
+        containerClass.prototype.child_set = function(actor, props) {
+            let meta = this.layout_manager.get_child_meta(this, actor);
+            for (let prop in props)
+                meta[prop] = props[prop];
+        };
+    else
+        containerClass.prototype.child_set = function(actor, props) {
+            let meta = this.get_child_meta(actor);
+            for (let prop in props)
+                meta[prop] = props[prop];
+        };
 
     // clutter_container_add() actually is a an add-many-actors
     // method. We conveniently, but somewhat dubiously, take the
@@ -54,8 +61,9 @@ function init() {
     }
 
     // Miscellaneous monkeypatching
-    _patchContainerClass(St.BoxLayout);
-    _patchContainerClass(St.Table);
+    _patchContainerClass(St.BoxLayout, false);
+    _patchContainerClass(St.Table, false);
+    _patchContainerClass(St.LayoutContainer, true);
 
     Clutter.Actor.prototype.toString = function() {
         return St.describe_actor(this);
