@@ -1332,6 +1332,7 @@ st_theme_node_render_resources (StThemeNode   *node,
   gboolean has_border;
   gboolean has_border_radius;
   gboolean has_inset_box_shadow;
+  gboolean has_complex_border;
   StShadow *box_shadow_spec;
   StShadow *background_image_shadow_spec;
   const char *background_image;
@@ -1369,6 +1370,23 @@ st_theme_node_render_resources (StThemeNode   *node,
   else
     has_border_radius = FALSE;
 
+  has_complex_border = FALSE;
+
+  if (has_border_radius) {
+    guint border_radius[4];
+    int corner;
+
+    st_theme_node_reduce_border_radius (node, border_radius);
+
+    for (corner = 0; corner < 4; corner ++) {
+      if (border_radius[corner]*2 > height ||
+          border_radius[corner]*2 > width) {
+        has_complex_border = TRUE;
+        break;
+      }
+    }
+  }
+
   /* Load referenced images from disk and draw anything we need with cairo now */
   background_image = st_theme_node_get_background_image (node);
   border_image = st_theme_node_get_border_image (node);
@@ -1389,7 +1407,8 @@ st_theme_node_render_resources (StThemeNode   *node,
 
   /* Use cairo to prerender the node if there is a gradient, or
    * background image with borders and/or rounded corners,
-   * since we can't do those things easily with cogl.
+   * or overlapping corner textures, since we can't do those things
+   * easily with cogl.
    *
    * FIXME: if we could figure out ahead of time that a
    * background image won't overlap with the node borders,
@@ -1397,7 +1416,8 @@ st_theme_node_render_resources (StThemeNode   *node,
    */
   if ((node->background_gradient_type != ST_GRADIENT_NONE)
       || (has_inset_box_shadow && (has_border || node->background_color.alpha > 0))
-      || (background_image && (has_border || has_border_radius)))
+      || (background_image && (has_border || has_border_radius))
+      || has_complex_border)
     node->prerendered_texture = st_theme_node_prerender_background (node);
 
   if (node->prerendered_texture)
