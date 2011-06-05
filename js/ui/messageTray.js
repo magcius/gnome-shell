@@ -429,6 +429,13 @@ Notification.prototype = {
 
         this._buttonFocusManager = St.FocusManager.get_for_stage(global.stage);
 
+        this._titleArea = new St.BoxLayout();
+        this._table.add(this._titleArea, { row: 0,
+                                           col: 0,
+                                           x_expand: true,
+                                           y_expand: false,
+                                           y_fill: false });
+
         // The first line should have the title, followed by the
         // banner text, but ellipsized if they won't both fit. We can't
         // make St.Table or St.BoxLayout do this the way we want (don't
@@ -438,10 +445,8 @@ Notification.prototype = {
         this._bannerBox.connect('get-preferred-width', Lang.bind(this, this._bannerBoxGetPreferredWidth));
         this._bannerBox.connect('get-preferred-height', Lang.bind(this, this._bannerBoxGetPreferredHeight));
         this._bannerBox.connect('allocate', Lang.bind(this, this._bannerBoxAllocate));
-        this._table.add(this._bannerBox, { row: 0,
-                                           col: 1,
-                                           y_expand: false,
-                                           y_fill: false });
+
+        this._titleArea.add(this._bannerBox);
 
         this._titleLabel = new St.Label();
         this._bannerBox.add_actor(this._titleLabel);
@@ -498,12 +503,7 @@ Notification.prototype = {
             this._table.remove_style_class_name('multi-line-notification');
 
         this._icon = params.icon || this.source.createNotificationIcon();
-        this._table.add(this._icon, { row: 0,
-                                      col: 0,
-                                      x_expand: false,
-                                      y_expand: false,
-                                      y_fill: false,
-                                      y_align: St.Align.START });
+        this._titleArea.insert_actor(this._icon, 0);
 
         title = title ? _fixMarkup(title.replace(/\n/g, ' '), params.titleMarkup) : '';
         this._titleLabel.clutter_text.set_markup('<b>' + title + '</b>');
@@ -558,7 +558,7 @@ Notification.prototype = {
                                                vscrollbar_policy: this._scrollPolicy,
                                                hscrollbar_policy: Gtk.PolicyType.NEVER,
                                                style_class: 'vfade' });
-        this._table.add(this._scrollArea, { row: 1, col: 1 });
+        this._table.add(this._scrollArea, { row: 1, col: 0 });
         this._contentArea = new St.BoxLayout({ name: 'notification-body',
                                                vertical: true });
         this._scrollArea.add_actor(this._contentArea);
@@ -635,7 +635,7 @@ Notification.prototype = {
         if (!props)
             props = {};
         props.row = 2;
-        props.col = 1;
+        props.col = 0;
 
         this._table.add_style_class_name('multi-line-notification');
         this._table.add(this._actionArea, props);
@@ -700,6 +700,7 @@ Notification.prototype = {
 
     _styleChanged: function() {
         this._spacing = this._table.get_theme_node().get_length('spacing-columns');
+        this._titleArea.set_style('spacing: %dpx;'.format(this._spacing));
     },
 
     _bannerBoxGetPreferredWidth: function(actor, forHeight, alloc) {
