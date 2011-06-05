@@ -214,7 +214,8 @@ NotificationDaemon.prototype = {
             }
         }
 
-        hints = Params.parse(hints, { urgency: Urgency.NORMAL }, true);
+        hints = Params.parse(hints, { urgency: Urgency.NORMAL,
+                                      count: 0 }, true);
 
         // Be compatible with the various hints for image data
         // 'image-data' is the latest name of this hint, introduced in 1.2
@@ -343,6 +344,9 @@ NotificationDaemon.prototype = {
                 notification.setUrgency(MessageTray.Urgency.CRITICAL);
                 break;
         }
+
+        source.setCount(hints.count);
+
         notification.setResident(hints.resident == true);
         // 'transient' is a reserved keyword in JS, so we have to retrieve the value
         // of the 'transient' hint with hints['transient'] rather than hints.transient
