@@ -59,6 +59,27 @@ function versionCheck(required, current) {
     return false;
 }
 
+function loadExtensionByUuid(uuid) {
+    let extensionPath, extension;
+
+    extensionPath = GLib.build_filenamev([global.userdatadir, 'extensions', uuid]);
+    extension = Gio.file_new_for_path (extensionPath);
+    if (extension.query_exists(null)) {
+        loadExtension(extension, true, ExtensionType.PER_USER);
+        return;
+    }
+
+    let systemDataDirs = GLib.get_system_data_dirs();
+    for (let i = 0; i < systemDataDirs.length; i++) {
+        extensionPath = GLib.build_filenamev([systemDataDirs[i], 'gnome-shell', 'extensions', uuid]);
+        extension = Gio.file_new_for_path(dirPath);
+        if (extension.query_exists(null)) {
+            loadExtension(extension, true, ExtensionType.SYSTEM);
+            return;
+        }
+    }
+}
+
 function loadExtension(dir, enabled, type) {
     let info;
     let baseErrorString = 'While loading extension from "' + dir.get_parse_name() + '": ';

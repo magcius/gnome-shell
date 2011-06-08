@@ -3,12 +3,17 @@
 const DBus = imports.dbus;
 
 const Main = imports.ui.main;
+const ExtensionSystem = imports.ui.extensionSystem;
 
 const GnomeShellIface = {
     name: 'org.gnome.Shell',
     methods: [{ name: 'Eval',
                 inSignature: 's',
                 outSignature: 'bs'
+              },
+              { name: 'LoadExtension',
+                inSignature: 's',
+                outSignature: ''
               }
              ],
     signals: [],
@@ -54,6 +59,10 @@ GnomeShell.prototype = {
             success = false;
         }
         return [success, returnValue];
+    },
+
+    LoadExtension: function(uuid) {
+        ExtensionSystem.loadExtensionByUuid(uuid);
     },
 
     get OverviewActive() {
