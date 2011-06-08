@@ -3,10 +3,12 @@
 
 import os
 import re
+import dbus
 import subprocess
 import sys
 import optparse
 import tempfile
+import zipfile
 try:
     import json
 except ImportError:
@@ -16,17 +18,10 @@ except ImportError:
         print 'The Python simplejson module is required'
         sys.exit(1)
 
-parser = optparse.OptionParser()
-parser.add_option("", "--create-extension", action="store_true",
-                  help="Create a new GNOME Shell extension")
+XDG_DATA_HOME = os.environ.get('XDG_DATA_HOME', os.path.join(os.path.expanduser('~/.local'), 'share'))
+EXTENSIONS_DIR = os.path.join(XDG_DATA_HOME, 'gnome-shell', 'extensions')
 
-options, args = parser.parse_args()
-
-if args:
-    parser.print_usage()
-    sys.exit(1)
-
-if options.create_extension:
+def create_extension():
     print
     print '''Name should be a very short (ideally descriptive) string.
 Examples are: "Click To Focus",  "Adblock", "Shell Window Shrinker".
@@ -54,7 +49,7 @@ use an extension title clicktofocus@janedoe.example.com.'''
     if uuid == '':
         uuid = sample_uuid
 
-    extension_path = os.path.join(os.path.expanduser('~/.local'), 'share', 'gnome-shell', 'extensions', uuid)
+    extension_path = os.path.join(extensiondir, uuid)
     if os.path.exists(extension_path):
         print "Extension path %r already exists" % (extension_path, )
         sys.exit(0)
@@ -109,4 +104,64 @@ function main() {
 
     print "Created extension in %r" % (extension_path, )
     subprocess.Popen(['gnome-open', extensionjs_path])
-    sys.exit(0)
+
+def install_extension(filename):
+
+    try:
+        z = zipfile.ZipFile(filename)
+    except zipfile.BadZipfile:
+        print >> sys.stderr, "Invalid extension, format is not ZIP file"
+        sys.exit(2)
+
+    try:
+        metadatafile = z.open('metadata.json', 'r')
+    except KeyError:
+        z.close()
+        print >> sys.stderr, "Invalid extension, missing metadata.json"
+        sys.exit(2)
+    
+    try:
+        metadata = json.load(metadatafile)
+    except ValueError, e:
+        metadatafile.close()
+        z.close()
+        print >> sys.stderr, "Invalid extension, not well-formed metadata.json"
+        print >> sys.stderr, e
+        sys.exit(2)
+
+    metadatafile.close()
+
+    if 'uuid' not in metadata:
+        z.close()
+        print >> sys.stderr, "Invalid extension, 'uuid' missing from metadata.json"
+        sys.exit(2)
+
+    extension_dir = os.path.join(EXTENSIONS_DIR, metadata['uuid'])
+
+    z.extract(extension_dir)
+    z.close()
+
+    try:
+        bus = dbus.SessionBus()
+        proxy = bus.get_object("org.gnome.Shell",
+                               "/org/gnome.Shell")
+        iface = dbus.Interface(proxy, dbus_interface="org.gnome.Shell")
+        iface.EnableExtension("uuid")
+    except dbus.exceptions.DBusException, e:
+        print >> sys.stderr, "Error enabling extension"
+        print >> sys.stderr, e
+        sys.exit(3)
+
+parser = optparse.OptionParser()
+parser.add_option("-c", "--create-extension", action="store_true",
+                  help="Create a new GNOME Shell extension")
+parser.add_option("-i", "--install-extension", metavar="FILE",
+                  dest="filename", help="Install a GNOME Shell extension")
+
+options, args = parser.parse_args()
+
+if options.create_extension:
+    create_extension()
+
+if options.filename:
+    install_extension(options.filename)
