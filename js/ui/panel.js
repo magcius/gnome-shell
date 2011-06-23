@@ -962,16 +962,34 @@ Panel.prototype = {
                 // This icon is not implemented (this is a bug)
                 continue;
             }
-            let indicator = new constructor();
-            this._statusBox.add(indicator.actor);
-            this._menus.addMenu(indicator.menu);
 
-            this._statusArea[role] = indicator;
+            let indicator = new constructor();
+            this.addToStatusArea(role, indicator, i-1);
         }
 
         // PopupMenuManager depends on menus being added in order for
         // keyboard navigation
         this._menus.addMenu(this._userMenu.menu);
+    },
+
+    addToStatusArea: function(role, indicator, position) {
+        if (!position)
+            position = 0;
+
+        this._statusBox.insert_actor(indicator.actor, position);
+        this._menus.addMenu(indicator.menu);
+
+        this._statusArea[role] = indicator;
+
+        return indicator;
+    },
+
+    removeFromStatusArea: function(role) {
+        let indicator = this._statusArea[role];
+
+        this._statusBox.remove_actor(indicator.actor);
+        this._menus.removeMenu(indicator.menu);
+        delete this._statusArea[role];
     },
 
     startupAnimation: function() {
