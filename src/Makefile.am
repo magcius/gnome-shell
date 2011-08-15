@@ -101,7 +101,6 @@ EXTRA_DIST += shell-marshal.list
 shell_public_headers_h =		\
 	shell-app.h			\
 	shell-app-system.h		\
-	shell-app-usage.h		\
 	shell-arrow.h			\
 	shell-doc-system.h		\
 	shell-embedded-window.h		\
@@ -135,7 +134,6 @@ libgnome_shell_la_SOURCES =		\
 	shell-a11y.h			\
 	shell-a11y.c			\
 	shell-app-system.c		\
-	shell-app-usage.c		\
 	shell-arrow.c			\
 	shell-doc-system.c		\
 	shell-embedded-window.c		\

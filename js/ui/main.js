@@ -93,7 +93,7 @@ function start() {
     // not loading any events until the user presses the clock
     global.launch_calendar_server();
 
-    // Ensure ShellWindowTracker and ShellAppUsage are initialized; this will
+    // Ensure ShellWindowTracker is initialized; this will
     // also initialize ShellAppSystem first.  ShellAppSystem
     // needs to load all the .desktop files, and ShellWindowTracker
     // will use those to associate with windows.  Right now
@@ -102,7 +102,6 @@ function start() {
     // races for now we initialize it here.  It's better to
     // be predictable anyways.
     Shell.WindowTracker.get_default();
-    Shell.AppUsage.get_default();
 
     // The stage is always covered so Clutter doesn't need to clear it; however
     // the color is used as the default contents for the Mutter root background
