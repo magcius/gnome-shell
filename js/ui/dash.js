@@ -470,10 +470,7 @@ Dash.prototype = {
     _redisplay: function () {
         let favorites = AppFavorites.getAppFavorites().getFavoriteMap();
 
-        /* hardcode here pending some design about how exactly desktop contexts behave */
-        let contextId = '';
-
-        let running = this._tracker.get_running_apps(contextId);
+        let running = this._tracker.get_running_apps();
 
         let children = this._box.get_children().filter(function(actor) {
                 return actor._delegate.child &&

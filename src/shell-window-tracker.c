@@ -410,12 +410,6 @@ get_app_for_window (ShellWindowTracker    *tracker,
   return result;
 }
 
-const char *
-_shell_window_tracker_get_app_context (ShellWindowTracker *tracker, ShellApp *app)
-{
-  return "";
-}
-
 static void
 update_focus_app (ShellWindowTracker *self)
 {
@@ -686,7 +680,7 @@ ShellApp *
 shell_window_tracker_get_app_from_pid (ShellWindowTracker *self, 
                                        int                 pid)
 {
-  GSList *running = shell_window_tracker_get_running_apps (self, "");
+  GSList *running = shell_window_tracker_get_running_apps (self);
   GSList *iter;
   ShellApp *result = NULL;
 
@@ -719,17 +713,14 @@ shell_window_tracker_get_app_from_pid (ShellWindowTracker *self,
 /**
  * shell_window_tracker_get_running_apps:
  * @tracker: An app monitor instance
- * @context: Activity identifier
  *
  * Returns the set of applications which currently have at least one open
- * window in the given context.  The returned list will be sorted
- * by shell_app_compare().
+ * window.  The returned list will be sorted by shell_app_compare().
  *
  * Returns: (element-type ShellApp) (transfer full): Active applications
  */
 GSList *
-shell_window_tracker_get_running_apps (ShellWindowTracker *tracker,
-                                       const char         *context)
+shell_window_tracker_get_running_apps (ShellWindowTracker *tracker)
 {
   gpointer key, value;
   GSList *ret;
@@ -741,9 +732,6 @@ shell_window_tracker_get_running_apps (ShellWindowTracker *tracker,
   while (g_hash_table_iter_next (&iter, &key, &value))
     {
       ShellApp *app = value;
-
-      if (strcmp (context, _shell_window_tracker_get_app_context (tracker, app)) != 0)
-        continue;
 
       ret = g_slist_prepend (ret, g_object_ref (app));
     }
