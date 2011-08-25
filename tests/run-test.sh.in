@@ -5,24 +5,35 @@ usage() {
     exit 1
 }
 
+at_other_args=false
+other_args=
 tests=
 verbose=false
 debug=
+
+if [[ "$@" = "" ]]; then
+    usage
+fi
+
 for arg in $@ ; do
-    case $arg in
-	-g|--debug)
-	    debug="libtool --mode=execute gdb --args"
-	    ;;
-	-v|--verbose)
-	    verbose=true
-	    ;;
-	-*)
-	    usage
-	    ;;
-	*)
-	    tests="$tests $arg"
-	    ;;
-    esac
+    if $at_other_args ; then
+        other_args="$other_args $arg"
+    else
+        case $arg in
+	    -g|--debug)
+	        debug="libtool --mode=execute gdb --args"
+	        ;;
+	    -v|--verbose)
+	        verbose=true
+	        ;;
+	    "--")
+                at_other_args=true
+	        ;;
+	    *)
+	        tests="$tests $arg"
+	        ;;
+        esac
+    fi
 done
 
 builddir=`dirname $0`
@@ -39,5 +50,5 @@ GNOME_SHELL_TESTSDIR="$srcdir/"
 export GI_TYPELIB_PATH GJS_PATH GJS_DEBUG_OUTPUT GJS_DEBUG_TOPICS GNOME_SHELL_JS GNOME_SHELL_TESTSDIR LD_PRELOAD
 
 for test in $tests ; do
-    $debug $builddir/../src/run-js-test $test || exit $?
+    $debug $builddir/../src/run-js-test $other_args $test || exit $?
 done
