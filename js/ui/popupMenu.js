@@ -4,6 +4,7 @@ const Cairo = imports.cairo;
 const Clutter = imports.gi.Clutter;
 const Gtk = imports.gi.Gtk;
 const Lang = imports.lang;
+const Mainloop = imports.mainloop;
 const Shell = imports.gi.Shell;
 const Signals = imports.signals;
 const St = imports.gi.St;
@@ -1157,6 +1158,9 @@ PopupMenu.prototype = {
     },
 
     close: function(animate) {
+        if (this.blockDisappear)
+            return;
+
         if (!this.isOpen)
             return;
 
@@ -1435,6 +1439,7 @@ PopupComboMenu.prototype = {
         this.actor.connect('key-press-event', Lang.bind(this, this._onKeyPressEvent));
         this.actor.connect('key-focus-in', Lang.bind(this, this._onKeyFocusIn));
         this._activeItemPos = -1;
+        this.blockDisappear = false;
         global.focus_manager.add_group(this.actor);
     },
 
@@ -1479,6 +1484,9 @@ PopupComboMenu.prototype = {
     },
 
     close: function() {
+        if (this.blockDisappear)
+            return;
+
         if (!this.isOpen)
             return;
 
@@ -1529,6 +1537,11 @@ PopupComboBoxMenuItem.prototype = {
 
         let expander = new St.Label({ text: '\u2304' });
         this.addActor(expander, { align: St.Align.END });
+
+        this.actor.connect('button-press-event',
+                           Lang.bind(this, function(actor, event) {
+                               this.activate(event);
+                           }));
 
         this._menu = new PopupComboMenu(this.actor);
         Main.uiGroup.add_actor(this._menu.actor);
@@ -1585,6 +1598,17 @@ PopupComboBoxMenuItem.prototype = {
     },
 
     activate: function(event) {
+        // In the case of a button press event, we want to make sure
+        // that the user didn't "click" to activate, so set a quick
+        // timeout to block the resulting hide.
+        if (event.type() == Clutter.EventType.BUTTON_PRESS) {
+            Mainloop.timeout_add(75, Lang.bind(this, function () {
+                this._menu.blockDisappear = false;
+            }));
+
+            this._menu.blockDisappear = true;
+        }
+
         let topMenu = this._getTopMenu();
         if (!topMenu)
             return;
