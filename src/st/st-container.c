@@ -427,6 +427,27 @@ st_container_dispose (GObject *object)
   G_OBJECT_CLASS (st_container_parent_class)->dispose (object);
 }
 
+void
+_st_container_paint (ClutterActor  *actor)
+{
+  CLUTTER_ACTOR_CLASS (st_container_parent_class)->paint (actor);
+
+  clutter_container_foreach (CLUTTER_CONTAINER (actor),
+                             CLUTTER_CALLBACK (clutter_actor_paint),
+                             NULL);
+}
+
+void
+_st_container_pick (ClutterActor        *actor,
+                    const ClutterColor  *color)
+{
+  CLUTTER_ACTOR_CLASS (st_container_parent_class)->pick (actor, color);
+
+  clutter_container_foreach (CLUTTER_CONTAINER (actor),
+                             CLUTTER_CALLBACK (clutter_actor_paint),
+                             NULL);
+}
+
 static gboolean
 st_container_get_paint_volume (ClutterActor *actor,
                                ClutterPaintVolume *volume)

@@ -66,6 +66,11 @@ void    st_container_move_before          (StContainer  *container,
                                            ClutterActor *sibling);
 GList * st_container_get_children_list    (StContainer *container);
 
+/* Standard vfunc implementations for subclasses of StContainer */
+void   _st_container_paint                (ClutterActor       *actor);
+void   _st_container_pick                 (ClutterActor       *actor,
+                                           const ClutterColor *color);
+
 G_END_DECLS
 
 #endif /* __ST_CONTAINER_H__ */
