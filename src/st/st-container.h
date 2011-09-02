@@ -51,20 +51,28 @@ struct _StContainerClass {
   GList * (*get_focus_chain) (StContainer *container);
 };
 
-GType   st_container_get_type             (void) G_GNUC_CONST;
+GType     st_container_get_type            (void) G_GNUC_CONST;
 
-void    st_container_destroy_children     (StContainer *container);
+void      st_container_destroy_children    (StContainer *container);
 
-GList * st_container_get_focus_chain      (StContainer *container);
+GList     * st_container_get_focus_chain   (StContainer *container);
 
-/* Only to be used by subclasses of StContainer */
-void    st_container_move_child           (StContainer  *container,
-                                           ClutterActor *actor,
-                                           int           pos);
-void    st_container_move_before          (StContainer  *container,
-                                           ClutterActor *actor,
-                                           ClutterActor *sibling);
-GList * st_container_get_children_list    (StContainer *container);
+/*        Only to be used by subclasses of StContainer */
+void      st_container_move_child          (StContainer  *container,
+                                            ClutterActor *actor,
+                                            int           pos);
+void      st_container_move_before         (StContainer  *container,
+                                            ClutterActor *actor,
+                                            ClutterActor *sibling);
+GList     * st_container_get_children_list (StContainer *container);
+
+/*        Standard vfunc implementations for subclasses of StContainer */
+void      st_container_real_paint              (ClutterActor       *actor);
+void      st_container_real_pick               (ClutterActor       *actor,
+                                                const ClutterColor *color);
+
+gboolean  st_container_real_get_paint_volume   (ClutterActor *actor,
+                                                ClutterPaintVolume *volume);
 
 G_END_DECLS
 
