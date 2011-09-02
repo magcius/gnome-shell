@@ -261,6 +261,7 @@ shell_generic_container_class_init (ShellGenericContainerClass *klass)
   actor_class->allocate = shell_generic_container_allocate;
   actor_class->paint = shell_generic_container_paint;
   actor_class->pick = shell_generic_container_pick;
+  actor_class->get_paint_volume = _st_container_get_paint_volume;
 
   container_class->get_focus_chain = shell_generic_container_get_focus_chain;
 

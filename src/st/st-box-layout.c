@@ -1018,28 +1018,36 @@ st_box_layout_get_paint_volume (ClutterActor       *actor,
                                 ClutterPaintVolume *volume)
 {
   StBoxLayout *self = ST_BOX_LAYOUT (actor);
+  StBoxLayoutPrivate *priv = self->priv;
   gdouble x, y;
 
   if (!CLUTTER_ACTOR_CLASS (st_box_layout_parent_class)->get_paint_volume (actor, volume))
     return FALSE;
 
-  /* When scrolled, st_box_layout_apply_transform() includes the scroll offset
-   * and affects paint volumes. This is right for our children, but our paint volume
-   * is determined by our allocation and borders and doesn't scroll, so we need
-   * to reverse-compensate here, the same as we do when painting.
-   */
-  get_border_paint_offsets (self, &x, &y);
-  if (x != 0 || y != 0)
+  if (priv->hadjustment || priv->vadjustment)
     {
-      ClutterVertex origin;
+      /* When scrolled, st_box_layout_apply_transform() includes the scroll offset
+       * and affects paint volumes. This is right for our children, but our paint volume
+       * is determined by our allocation and borders and doesn't scroll, so we need
+       * to reverse-compensate here, the same as we do when painting.
+       */
+      get_border_paint_offsets (self, &x, &y);
+      if (x != 0 || y != 0)
+        {
+          ClutterVertex origin;
 
-      clutter_paint_volume_get_origin (volume, &origin);
-      origin.x += x;
-      origin.y += y;
-      clutter_paint_volume_set_origin (volume, &origin);
+          clutter_paint_volume_get_origin (volume, &origin);
+          origin.x += x;
+          origin.y += y;
+          clutter_paint_volume_set_origin (volume, &origin);
+        }
+
+      return TRUE;
     }
-
-  return TRUE;
+  else
+    {
+      return _st_container_get_paint_volume (actor, volume);
+    }
 }
 
 static void
