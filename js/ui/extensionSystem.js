@@ -3,6 +3,7 @@
 const Lang = imports.lang;
 const Signals = imports.signals;
 
+const Clutter = imports.gi.Clutter;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const St = imports.gi.St;
@@ -10,6 +11,9 @@ const Shell = imports.gi.Shell;
 const Soup = imports.gi.Soup;
 
 const Config = imports.misc.config;
+const ModalDialog = imports.ui.modalDialog;
+
+const API_VERSION = 1;
 
 const ExtensionState = {
     ENABLED: 1,
@@ -27,6 +31,10 @@ const ExtensionType = {
     SYSTEM: 1,
     PER_USER: 2
 };
+
+const REPOSITORY_URL_BASE = 'https://extensions.gnome.org';
+const REPOSITORY_URL_DOWNLOAD = REPOSITORY_URL_BASE + '/download-extension/%s.shell-extension.zip';
+const REPOSITORY_URL_INFO =     REPOSITORY_URL_BASE + '/extension-info/';
 
 const _httpSession = new Soup.SessionAsync();
 
@@ -92,52 +100,19 @@ function versionCheck(required, current) {
     return false;
 }
 
-function installExtensionFromManifestURL(uuid, url) {
-    _httpSession.queue_message(
-        Soup.Message.new('GET', url),
-        function(session, message) {
-            if (message.status_code != Soup.KnownStatusCode.OK) {
-                logExtensionError(uuid, 'downloading manifest: ' + message.status_code.toString());
-                return;
-            }
+function installExtensionFromUUID(uuid, version_tag) {
+    let params = { uuid: uuid,
+                   version_tag: version_tag,
+                   shell_version: Config.PACKAGE_VERSION,
+                   api_version: API_VERSION.toString() };
 
-            let manifest;
-            try {
-                manifest = JSON.parse(message.response_body.data);
-            } catch (e) {
-                logExtensionError(uuid, 'parsing: ' + e.toString());
-                return;
-            }
+    let message = Soup.form_request_new_from_hash('GET', REPOSITORY_URL_INFO, params);
 
-            if (uuid != manifest['uuid']) {
-                logExtensionError(uuid, 'manifest: manifest uuids do not match');
-                return;
-            }
-
-            let meta = extensionMeta[uuid] = { uuid: uuid,
-                                               state: ExtensionState.DOWNLOADING,
-                                               error: '' };
-
-            _signals.emit('extension-state-changed', meta);
-
-            installExtensionFromManifest(manifest, meta);
-        });
-}
-
-function installExtensionFromManifest(manifest, meta) {
-    let uuid = manifest['uuid'];
-    let name = manifest['name'];
-
-    if (!versionCheck(manifest['shell-version'], Config.PACKAGE_VERSION)) {
-        meta.state = ExtensionState.OUT_OF_DATE;
-        logExtensionError(uuid, 'version: ' + name + ' is not compatible with current GNOME Shell version', meta.state);
-        return;
-    }
-
-    let url = manifest['__installer'];
-    _httpSession.queue_message(Soup.Message.new('GET', url),
+    _httpSession.queue_message(message,
                                function(session, message) {
-                                   gotExtensionZipFile(session, message, uuid);
+                                   let info = JSON.parse(message.response_body.data);
+                                   let dialog = new InstallExtensionDialog(uuid, version_tag, info.name);
+                                   dialog.open(global.get_current_time());
                                });
 }
 
@@ -434,3 +409,73 @@ function loadExtensions() {
             _loadExtensionsIn(dir, ExtensionType.SYSTEM);
     }
 }
+
+function InstallExtensionDialog(uuid, version_tag, name) {
+    this._init(uuid, version_tag, name);
+}
+
+InstallExtensionDialog.prototype = {
+    __proto__: ModalDialog.ModalDialog.prototype,
+
+    _init: function(uuid, version_tag, name) {
+        ModalDialog.ModalDialog.prototype._init.call(this, { styleClass: 'extension-dialog' });
+
+        this._uuid = uuid;
+        this._version_tag = version_tag;
+        this._name = name;
+
+        this.setButtons([{ label: _("Cancel"),
+                           action: Lang.bind(this, this._onCancelButtonPressed),
+                           key:    Clutter.Escape
+                         },
+                         { label:  _("Install"),
+                           action: Lang.bind(this, this._onInstallButtonPressed)
+                         }]);
+
+        let message = _("Download and install '%s' from extensions.gnome.org?").format(name);
+
+        this._descriptionLabel = new St.Label({ text: message });
+
+        this.contentLayout.add(this._descriptionLabel,
+                               { y_fill:  true,
+                                 y_align: St.Align.START });
+    },
+
+    _onCancelButtonPressed: function(button, event) {
+        this.close(global.get_current_time());
+
+        // Even though the extension is already "uninstalled", send through
+        // a state-changed signal for any users who want to know if the install
+        // went through correctly -- using proper async DBus would block more
+        // traditional clients like the plugin
+        let meta = { uuid: this._uuid,
+                     state: ExtensionState.UNINSTALLED,
+                     error: '' };
+
+        _signals.emit('extension-state-changed', meta);
+    },
+
+    _onInstallButtonPressed: function(button, event) {
+        let meta = { uuid: this._uuid,
+                     state: ExtensionState.DOWNLOADING,
+                     error: '' };
+
+        extensionMeta[this._uuid] = meta;
+
+        _signals.emit('extension-state-changed', meta);
+
+        let params = { version_tag: this._version_tag,
+                       shell_version: Config.PACKAGE_VERSION,
+                       api_version: API_VERSION.toString() };
+
+        let url = REPOSITORY_URL_DOWNLOAD.format(this._uuid);
+        let message = Soup.form_request_new_from_hash('GET', url, params);
+
+        _httpSession.queue_message(message,
+                                   Lang.bind(this, function(session, message) {
+                                       gotExtensionZipFile(session, message, this._uuid);
+                                   }));
+
+        this.close(global.get_current_time());
+    }
+};
