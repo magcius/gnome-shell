@@ -33,7 +33,7 @@ const ExtensionType = {
     PER_USER: 2
 };
 
-const REPOSITORY_URL_BASE = 'https://extensions.gnome.org';
+const REPOSITORY_URL_BASE = 'http://localhost:8000';
 const REPOSITORY_URL_DOWNLOAD = REPOSITORY_URL_BASE + '/download-extension/%s.shell-extension.zip';
 const REPOSITORY_URL_INFO =     REPOSITORY_URL_BASE + '/extension-info/';
 

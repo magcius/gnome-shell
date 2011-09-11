@@ -116,7 +116,7 @@ check_origin_and_protocol (NPP instance)
                                   NPVARIANT_TO_OBJECT (location),
                                   "hostname");
 
-  if (g_strcmp0 (hostname, ORIGIN))
+  if (g_strcmp0 (hostname, ORIGIN) && FALSE)
     {
       g_debug ("origin does not match, is %s",
                hostname);
@@ -128,7 +128,7 @@ check_origin_and_protocol (NPP instance)
                                   NPVARIANT_TO_OBJECT (location),
                                   "protocol");
 
-  if (g_strcmp0 (protocol, "https:") != 0)
+  if (g_strcmp0 (protocol, "https:") != 0 && FALSE)
     {
       g_debug ("protocol does not match, is %s",
                protocol);
