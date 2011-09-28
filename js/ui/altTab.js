@@ -199,23 +199,23 @@ const AltTabPopup = new Lang.Class({
         // Make the initial selection
         if (binding == 'switch-group') {
             if (backward) {
-                this._select(0, this._appIcons[0].cachedWindows.length - 1);
+                this._select({ app: 0, window: this._appIcons[0].cachedWindows.length - 1 });
             } else {
                 if (this._appIcons[0].cachedWindows.length > 1)
-                    this._select(0, 1);
+                    this._select({ app: 0, window: 1 });
                 else
-                    this._select(0, 0);
+                    this._select({ app: 0, window: 0 });
             }
         } else if (binding == 'switch-group-backward') {
-            this._select(0, this._appIcons[0].cachedWindows.length - 1);
+            this._select({ app: 0, window: this._appIcons[0].cachedWindows.length - 1 });
         } else if (binding == 'switch-windows-backward') {
-            this._select(this._appIcons.length - 1);
+            this._select({ app: this._appIcons.length - 1 });
         } else if (this._appIcons.length == 1) {
-            this._select(0);
+            this._select({ app: 0 });
         } else if (backward) {
-            this._select(this._appIcons.length - 1);
+            this._select({ app: this._appIcons.length - 1 });
         } else {
-            this._select(1);
+            this._select({ app: 1 });
         }
 
         // There's a race condition; if the user released Alt before
@@ -241,25 +241,29 @@ const AltTabPopup = new Lang.Class({
     },
 
     _nextApp : function() {
-        return mod(this._currentApp + 1, this._appIcons.length);
+        return { app: mod(this._currentApp + 1, this._appIcons.length) };
     },
     _previousApp : function() {
-        return mod(this._currentApp - 1, this._appIcons.length);
+        return { app: mod(this._currentApp - 1, this._appIcons.length) };
     },
 
     _nextWindow : function() {
         // We actually want the second window if we're in the unset state
         if (this._currentWindow == -1)
             this._currentWindow = 0;
-        return mod(this._currentWindow + 1,
-                   this._appIcons[this._currentApp].cachedWindows.length);
+
+        return { app: this._currentApp,
+                 window: mod(this._currentWindow + 1,
+                             this._appIcons[this._currentApp].cachedWindows.length) };
     },
     _previousWindow : function() {
         // Also assume second window here
         if (this._currentWindow == -1)
             this._currentWindow = 1;
-        return mod(this._currentWindow - 1,
-                   this._appIcons[this._currentApp].cachedWindows.length);
+
+        return { app: this._currentApp,
+                 window: mod(this._currentWindow - 1,
+                             this._appIcons[this._currentApp].cachedWindows.length) };
     },
 
     _keyPressEvent : function(actor, event) {
@@ -273,27 +277,27 @@ const AltTabPopup = new Lang.Class({
         if (keysym == Clutter.Escape) {
             this.destroy();
         } else if (action == Meta.KeyBindingAction.SWITCH_GROUP) {
-            this._select(this._currentApp, backwards ? this._previousWindow() : this._nextWindow());
+            this._select(backwards ? this._previousWindow() : this._nextWindow());
         } else if (action == Meta.KeyBindingAction.SWITCH_GROUP_BACKWARD) {
-            this._select(this._currentApp, this._previousWindow());
+            this._select(this._previousWindow());
         } else if (action == Meta.KeyBindingAction.SWITCH_WINDOWS) {
             this._select(backwards ? this._previousApp() : this._nextApp());
         } else if (action == Meta.KeyBindingAction.SWITCH_WINDOWS_BACKWARD) {
             this._select(this._previousApp());
         } else if (this._thumbnailsFocused) {
             if (keysym == Clutter.Left)
-                this._select(this._currentApp, this._previousWindow());
+                this._select(this._previousWindow());
             else if (keysym == Clutter.Right)
-                this._select(this._currentApp, this._nextWindow());
+                this._select(this._nextWindow());
             else if (keysym == Clutter.Up)
-                this._select(this._currentApp, null, true);
+                this._select({ app: this._currentApp }, true);
         } else {
             if (keysym == Clutter.Left)
                 this._select(this._previousApp());
             else if (keysym == Clutter.Right)
                 this._select(this._nextApp());
             else if (keysym == Clutter.Down)
-                this._select(this._currentApp, 0);
+                this._select({ app: this._currentApp, window: 0 });
         }
 
         return true;
@@ -316,11 +320,11 @@ const AltTabPopup = new Lang.Class({
                 if (this._currentWindow == 0 || this._currentWindow == -1)
                     this._select(this._previousApp());
                 else
-                    this._select(this._currentApp, this._previousWindow());
+                    this._select(this._previousWindow());
             } else {
                 let nwindows = this._appIcons[this._currentApp].cachedWindows.length;
                 if (nwindows > 1)
-                    this._select(this._currentApp, nwindows - 1);
+                    this._select({ app: this._currentApp, item: nwindows - 1 });
                 else
                     this._select(this._previousApp());
             }
@@ -329,11 +333,11 @@ const AltTabPopup = new Lang.Class({
                 if (this._currentWindow == this._appIcons[this._currentApp].cachedWindows.length - 1)
                     this._select(this._nextApp());
                 else
-                    this._select(this._currentApp, this._nextWindow());
+                    this._select(this._nextWindow());
             } else {
                 let nwindows = this._appIcons[this._currentApp].cachedWindows.length;
                 if (nwindows > 1)
-                    this._select(this._currentApp, 0);
+                    this._select({ app: this._currentApp, window: 0 });
                 else
                     this._select(this._nextApp());
             }
@@ -365,7 +369,7 @@ const AltTabPopup = new Lang.Class({
         if (!this._mouseActive)
             return;
 
-        this._select(n);
+        this._select({ app: n });
     },
 
     _windowActivated : function(thumbnailList, n) {
@@ -378,7 +382,7 @@ const AltTabPopup = new Lang.Class({
         if (!this._mouseActive)
             return;
 
-        this._select(this._currentApp, n);
+        this._select({ app: this._currentApp, window: n });
     },
 
     _disableHover : function() {
@@ -444,8 +448,7 @@ const AltTabPopup = new Lang.Class({
 
     /**
      * _select:
-     * @app: index of the app to select
-     * @window: (optional) index of which of @app's windows to select
+     * @item: an object with @app and @window fields
      * @forceAppFocus: optional flag, see below
      *
      * Selects the indicated @app, and optional @window, and sets
@@ -467,7 +470,9 @@ const AltTabPopup = new Lang.Class({
      * then @app will be highlighted, and @window outlined, and the
      * app list will have the keyboard focus.
      */
-    _select : function(app, window, forceAppFocus) {
+    _select : function(item, forceAppFocus) {
+        let { app: app, window: window } = item;
+
         if (app != this._currentApp || window == null) {
             if (this._thumbnails)
                 this._destroyThumbnails();
