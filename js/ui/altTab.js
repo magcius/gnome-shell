@@ -199,12 +199,13 @@ const AltTabPopup = new Lang.Class({
         // Make the initial selection
         if (binding == 'switch-group') {
             if (backward) {
-                this._select({ app: 0, window: this._appIcons[0].cachedWindows.length - 1 });
+                let app = this._appIcons.length - 1;
+                this._select({ app: app, window: this._appIcons[app].cachedWindows.length - 1 });
             } else {
                 if (this._appIcons[0].cachedWindows.length > 1)
                     this._select({ app: 0, window: 1 });
                 else
-                    this._select({ app: 0, window: 0 });
+                    this._select({ app: 1, window: 0 });
             }
         } else if (binding == 'switch-group-backward') {
             this._select({ app: 0, window: this._appIcons[0].cachedWindows.length - 1 });
@@ -248,22 +249,28 @@ const AltTabPopup = new Lang.Class({
     },
 
     _nextWindow : function() {
-        // We actually want the second window if we're in the unset state
-        if (this._currentWindow == -1)
-            this._currentWindow = 0;
+        if (this._currentWindow == -1) {
+            return { app: this._currentApp,
+                     window: 0 };
+        } else if (this._currentWindow + 1 >= this._appIcons[this._currentApp].cachedWindows.length) {
+            let { app: app } = this._nextApp();
+            return { app: app,
+                     window: 0 };
+        }
 
         return { app: this._currentApp,
-                 window: mod(this._currentWindow + 1,
-                             this._appIcons[this._currentApp].cachedWindows.length) };
+                 window: this._currentWindow + 1 };
     },
+
     _previousWindow : function() {
-        // Also assume second window here
-        if (this._currentWindow == -1)
-            this._currentWindow = 1;
+        if (this._currentWindow <= 0) {
+            let { app: app } = this._previousApp();
+            return { app: app,
+                     window: this._appIcons[app].cachedWindows.length - 1 };
+        }
 
         return { app: this._currentApp,
-                 window: mod(this._currentWindow - 1,
-                             this._appIcons[this._currentApp].cachedWindows.length) };
+                 window: this._currentWindow - 1 };
     },
 
     _keyPressEvent : function(actor, event) {
