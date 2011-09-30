@@ -205,6 +205,59 @@ shell_window_tracker_is_window_interesting (MetaWindow *window)
 }
 
 /**
+ * get_app_from_desktop_file:
+ *
+ * Looks only at the given window, and attempts to determine
+ * an application based on _GNOME_PRIV_DESKTOP_FILE.  If one can't be
+ * determined, return %NULL.
+ *
+ * Return value: (transfer full): A newly-referenced #ShellApp, or %NULL
+ */
+static ShellApp *
+get_app_from_desktop_file (MetaWindow *window)
+{
+  ShellApp *app;
+  ShellAppSystem *appsys;
+  gchar *desktop_file;
+  int result;
+  int format;
+  Atom atom;
+  Atom type;
+  gulong nitems;
+  gulong bytes_after;
+  Display *display;
+
+  appsys = shell_app_system_get_default ();
+  display = meta_display_get_xdisplay (meta_window_get_display (window));
+  atom = XInternAtom (display, _GNOME_PRIV_DESKTOP_FILE, False);
+
+  result = XGetWindowProperty (display,
+                               meta_window_get_xwindow (window),
+                               atom,
+                               0, G_MAXINT,
+                               False,
+                               XA_STRING,
+                               &type,
+                               &format,
+                               &nitems,
+                               &bytes_after,
+                               (guchar **) &desktop_file);
+
+  if (result != Success)
+    return NULL;
+
+  if (nitems == 0)
+    return NULL;
+
+  app = shell_app_system_lookup_heuristic_basename (appsys, desktop_file);
+  if (app != NULL)
+    g_object_ref (app);
+
+  XFree (desktop_file);
+  return app;
+}
+
+/**
  * get_app_from_window_wmclass:
  *
  * Looks only at the given window, and attempts to determine
@@ -351,6 +404,10 @@ get_app_for_window (ShellWindowTracker    *tracker,
   if (meta_window_is_remote (window))
     return _shell_app_new_for_window (window);
 
+  result = get_app_from_desktop_file (window);
+  if (result != NULL)
+    return result;
+
   /* Check if the app's WM_CLASS specifies an app; this is
    * canonical if it does.
    */
@@ -435,6 +492,28 @@ on_wm_class_changed (MetaWindow  *window,
 }
 
 static void
+ensure_desktop_file_atom_set (MetaWindow         *window,
+                              ShellApp           *app)
+{
+  Atom atom;
+  Display *display;
+  const gchar *data;
+
+  display = meta_display_get_xdisplay (meta_window_get_display (window));
+  atom = XInternAtom (display, _GNOME_PRIV_DESKTOP_FILE, False);
+  data = shell_app_get_id (app);
+
+  XChangeProperty (display,
+                   meta_window_get_xwindow (window),
+                   atom,
+                   XA_STRING,
+                   8,
+                   PropModeReplace,
+                   (guchar *) data,
+                   strlen (data));
+}
+
+static void
 track_window (ShellWindowTracker *self,
               MetaWindow      *window)
 {
@@ -453,6 +532,8 @@ track_window (ShellWindowTracker *self,
   g_signal_connect (window, "notify::wm-class", G_CALLBACK (on_wm_class_changed), self);
 
   _shell_app_add_window (app, window);
+
+  ensure_desktop_file_atom_set (window, app);
 
   g_signal_emit (self, signals[TRACKED_WINDOWS_CHANGED], 0);
 }
