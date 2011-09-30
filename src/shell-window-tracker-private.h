@@ -4,6 +4,8 @@
 
 #include "shell-window-tracker.h"
 
+#define _GNOME_PRIV_DESKTOP_FILE "_GNOME_PRIV_DESKTOP_FILE"
+
 void _shell_window_tracker_add_child_process_app (ShellWindowTracker *tracker,
                                                   GPid                pid,
                                                   ShellApp           *app);
