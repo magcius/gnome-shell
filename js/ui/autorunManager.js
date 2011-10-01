@@ -543,10 +543,12 @@ const AutorunTransientNotification = new Lang.Class({
         this._box.add(this._buttonForEject(), { x_fill: true,
                                                 x_align: St.Align.START });
 
-        // set the notification to transient and urgent, so that it
-        // expands out
+        // Set the notification to be transient, auto-expand and
+        // without a timeout. Don't use URGENT as it may block
+        // other notifications.
         this.setTransient(true);
-        this.setUrgency(MessageTray.Urgency.CRITICAL);
+        this.setAutoExpand(true);
+        this.setShouldTimeout(false);
     },
 
     _buttonForApp: function(app) {
