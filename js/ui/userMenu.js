@@ -194,8 +194,7 @@ IMStatusChooserItem.prototype = {
                                                  Lang.bind(this,
                                                            this._updateUser));
         this.actor.connect('notify::mapped', Lang.bind(this, function() {
-            if (this.actor.mapped)
-                this._updateUser();
+            this._updateUser();
         }));
     },
 
@@ -224,6 +223,9 @@ IMStatusChooserItem.prototype = {
     },
 
     _updateUser: function() {
+        if (!this.actor.mapped)
+            return;
+
         let iconFile = null;
         if (this._user.is_loaded) {
             this._name.label.set_text(this._user.get_real_name());
