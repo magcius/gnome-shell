@@ -422,6 +422,8 @@ Notification.prototype = {
         this.resident = false;
         // 'transient' is a reserved keyword in JS, so we have to use an alternate variable name
         this.isTransient = false;
+        this.autoExpand = false;
+        this.shouldTimeout = true;
         this.expanded = false;
         this._destroyed = false;
         this._useActionIcons = false;
@@ -776,6 +778,14 @@ Notification.prototype = {
 
     setTransient: function(isTransient) {
         this.isTransient = isTransient;
+    },
+
+    setAutoExpand: function(shouldAutoExpand) {
+        this.autoExpand = shouldAutoExpand;
+    },
+
+    setShouldTimeout: function(shouldTimeout) {
+        this.shouldTimeout = shouldTimeout;
     },
 
     setUseActionIcons: function(useIcons) {
@@ -1965,7 +1975,11 @@ MessageTray.prototype = {
         // notification we are updating, in case that notification was already expanded and its height
         // changed. Therefore we need to call this._expandNotification() for expanded notifications
         // to make sure their position is updated.
-        if (this._notification.urgency == Urgency.CRITICAL || this._notification.expanded)
+        let autoExpand = (this._notification.autoExpand ||
+                          this._notification.urgency == Urgency.CRITICAL ||
+                          this._notification.expanded);
+
+        if (autoExpand)
             this._expandNotification(true);
 
         // We tween all notifications to full opacity. This ensures that both new notifications and
@@ -1994,7 +2008,7 @@ MessageTray.prototype = {
    },
 
     _showNotificationCompleted: function() {
-        if (this._notification.urgency != Urgency.CRITICAL)
+        if (this._notification.shouldTimeout && this._notification.urgency != Urgency.CRITICAL)
             this._updateNotificationTimeout(NOTIFICATION_TIMEOUT * 1000);
     },
 
