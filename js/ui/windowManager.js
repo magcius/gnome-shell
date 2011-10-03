@@ -121,8 +121,11 @@ WindowManager.prototype = {
         this._shellwm.connect('destroy', Lang.bind(this, this._destroyWindow));
 
         this._workspaceSwitcherPopup = null;
-        this.setKeybindingHandler('switch-to-workspace-left', Lang.bind(this, this._showWorkspaceSwitcher));
-        this.setKeybindingHandler('switch-to-workspace-right', Lang.bind(this, this._showWorkspaceSwitcher));
+
+        // Remove the default popup for left/right
+        this._shellwm.takeover_keybinding('switch-to-workspace-left');
+        this._shellwm.takeover_keybinding('switch-to-workspace-right');
+
         this.setKeybindingHandler('switch-to-workspace-up', Lang.bind(this, this._showWorkspaceSwitcher));
         this.setKeybindingHandler('switch-to-workspace-down', Lang.bind(this, this._showWorkspaceSwitcher));
         this.setKeybindingHandler('switch-windows', Lang.bind(this, this._startAppSwitcher));
@@ -560,44 +563,6 @@ WindowManager.prototype = {
             this.actionMoveWorkspaceUp();
         else if (binding == 'switch-to-workspace-down')
             this.actionMoveWorkspaceDown();
-        // left/right would effectively act as synonyms for up/down if we enabled them;
-        // but that could be considered confusing.
-        // else if (binding == 'switch-to-workspace-left')
-        //   this.actionMoveWorkspaceLeft();
-        // else if (binding == 'switch-to-workspace-right')
-        //   this.actionMoveWorkspaceRight();
-    },
-
-    actionMoveWorkspaceLeft: function() {
-        let rtl = (St.Widget.get_default_direction() == St.TextDirection.RTL);
-        let activeWorkspaceIndex = global.screen.get_active_workspace_index();
-        let indexToActivate = activeWorkspaceIndex;
-        if (rtl && activeWorkspaceIndex < global.screen.n_workspaces - 1)
-            indexToActivate++;
-        else if (!rtl && activeWorkspaceIndex > 0)
-            indexToActivate--;
-
-        if (indexToActivate != activeWorkspaceIndex)
-            global.screen.get_workspace_by_index(indexToActivate).activate(global.get_current_time());
-
-        if (!Main.overview.visible)
-            this._workspaceSwitcherPopup.display(WorkspaceSwitcherPopup.UP, indexToActivate);
-    },
-
-    actionMoveWorkspaceRight: function() {
-        let rtl = (St.Widget.get_default_direction() == St.TextDirection.RTL);
-        let activeWorkspaceIndex = global.screen.get_active_workspace_index();
-        let indexToActivate = activeWorkspaceIndex;
-        if (rtl && activeWorkspaceIndex > 0)
-            indexToActivate--;
-        else if (!rtl && activeWorkspaceIndex < global.screen.n_workspaces - 1)
-            indexToActivate++;
-
-        if (indexToActivate != activeWorkspaceIndex)
-            global.screen.get_workspace_by_index(indexToActivate).activate(global.get_current_time());
-
-        if (!Main.overview.visible)
-            this._workspaceSwitcherPopup.display(WorkspaceSwitcherPopup.DOWN, indexToActivate);
     },
 
     actionMoveWorkspaceUp: function() {
