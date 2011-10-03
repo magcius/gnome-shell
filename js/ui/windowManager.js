@@ -98,6 +98,7 @@ WindowManager.prototype = {
         this._unmaximizing = [];
         this._mapping = [];
         this._destroying = [];
+        this._movingWindow = null;
 
         this._dimmedWindows = [];
 
@@ -471,11 +472,13 @@ WindowManager.prototype = {
         this._switchData = switchData;
         switchData.inGroup = new Clutter.Group();
         switchData.outGroup = new Clutter.Group();
+        switchData.movingWindowBin = new Clutter.Group();
         switchData.windows = [];
 
         let wgroup = global.window_group;
         wgroup.add_actor(switchData.inGroup);
         wgroup.add_actor(switchData.outGroup);
+        wgroup.add_actor(switchData.movingWindowBin);
 
         for (let i = 0; i < windows.length; i++) {
             let window = windows[i];
@@ -483,7 +486,12 @@ WindowManager.prototype = {
             if (!window.meta_window.showing_on_its_workspace())
                 continue;
 
-            if (window.get_workspace() == from) {
+            if (this._movingWindow && window.meta_window == this._movingWindow) {
+                switchData.movingWindow = { window: window,
+                                            parent: window.get_parent() };
+                switchData.windows.push(switchData.movingWindow);
+                window.reparent(switchData.movingWindowBin);
+            } else if (window.get_workspace() == from) {
                 switchData.windows.push({ window: window,
                                           parent: window.get_parent() });
                 window.reparent(switchData.outGroup);
@@ -497,6 +505,8 @@ WindowManager.prototype = {
 
         switchData.inGroup.set_position(-xDest, -yDest);
         switchData.inGroup.raise_top();
+
+        switchData.movingWindowBin.raise_top();
 
         Tweener.addTween(switchData.outGroup,
                          { x: xDest,
@@ -535,6 +545,10 @@ WindowManager.prototype = {
         Tweener.removeTweens(switchData.outGroup);
         switchData.inGroup.destroy();
         switchData.outGroup.destroy();
+        switchData.movingWindowBin.destroy();
+
+        if (this._movingWindow)
+            this._movingWindow = null;
 
         shellwm.completed_switch_workspace();
     },
@@ -594,6 +608,8 @@ WindowManager.prototype = {
                 if (workspace.index() == lastWorkspaceIdx && workspace.list_windows().length == 1)
                     return;
             }
+
+            this._movingWindow = window;
 
             window.change_workspace_by_index(index, true, timestamp);
         }
