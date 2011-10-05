@@ -79,6 +79,8 @@ int shell_app_compare_by_name (ShellApp *app, ShellApp *other);
 
 int shell_app_compare (ShellApp *app, ShellApp *other);
 
+ClutterColor *shell_app_get_prominent_icon_color (ShellApp *app);
+
 G_END_DECLS
 
 #endif /* __SHELL_APP_H__ */
