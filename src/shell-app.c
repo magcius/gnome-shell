@@ -273,6 +273,184 @@ shell_app_grab_icon_pixbuf (ShellApp          *app,
   return pixbuf;
 }
 
+/* Traditional Graphics Gems algorithm for converting to hsl */
+static void
+convert_to_hsl (gfloat  red,
+                gfloat  green,
+                gfloat  blue,
+                gfloat *hue,
+                gfloat *saturation,
+                gfloat *luminance)
+{
+  gfloat min, max, delta;
+  gfloat h, l, s;
+
+  max = MAX (red, MAX (green, blue));
+  min = MIN (red, MIN (green, blue));
+
+  l = (max + min) / 2;
+  s = 0;
+  h = 0;
+
+  if (max != min)
+    {
+      if (l <= 0.5)
+	s = (max - min) / (max + min);
+      else
+	s = (max - min) / (2.0 - max - min);
+
+      delta = max - min;
+
+      if (red == max)
+	h = (green - blue) / delta;
+      else if (green == max)
+	h = 2.0 + (blue - red) / delta;
+      else if (blue == max)
+	h = 4.0 + (red - green) / delta;
+
+      h *= 60;
+
+      if (h < 0)
+	h += 360.0;
+    }
+
+  *hue = h;
+  *luminance = l;
+  *saturation = s;
+}
+
+#define BIN_SIZE 16
+#define ALPHA_THRESHOLD 40
+#define SATURATION_THRESHOLD 0.2
+
+static guint
+pixbuf_get_prominent_icon_color (GdkPixbuf *pixbuf)
+{
+  /* The algorithm is a basic 3D histogram.
+   * We scan an image, fitting each color into one of BIN_SIZE**3 bins
+   * Then we look for the bin with the most pixels in it.
+   */
+
+  gint width, height, rowstride;
+  guint i, j, k;
+  guint8 n_channels;
+  gboolean have_alpha;
+  guint8 *pixels;
+  guint bins[BIN_SIZE][BIN_SIZE][BIN_SIZE];
+  guint max_bin_color, max_bin_count;
+  guint8 red, green, blue;
+  gfloat hue, sat, lit;
+
+  memset (bins, 0, sizeof (bins));
+
+  width = gdk_pixbuf_get_width (pixbuf);
+  height = gdk_pixbuf_get_height (pixbuf);
+  rowstride = gdk_pixbuf_get_rowstride (pixbuf);
+  n_channels = gdk_pixbuf_get_n_channels (pixbuf);
+  have_alpha = gdk_pixbuf_get_has_alpha (pixbuf);
+  pixels = gdk_pixbuf_get_pixels (pixbuf);
+
+  for (i = 0; i < width; i++)
+    {
+      for (j = 0; j < height; j++)
+        {
+          guint8 *pixel = &pixels[j * rowstride + i * n_channels];
+
+          /* Ignore pixels that are so transparent they won't contribute */
+          if (have_alpha && pixel[3] < ALPHA_THRESHOLD)
+            continue;
+
+          convert_to_hsl (pixel[0] / 255.0,
+                          pixel[1] / 255.0,
+                          pixel[2] / 255.0,
+                          &hue, &sat, &lit);
+
+          /* Ignore pixels that are so dark they won't contribute */
+          if (sat < SATURATION_THRESHOLD)
+            continue;
+
+          red   = pixel[0] * BIN_SIZE / 256;
+          g_assert (red < BIN_SIZE);
+
+          green = pixel[1] * BIN_SIZE / 256;
+          g_assert (green < BIN_SIZE);
+
+          blue  = pixel[2] * BIN_SIZE / 256;
+          g_assert (blue < BIN_SIZE);
+
+          bins[red][green][blue] ++;
+        }
+    }
+
+  max_bin_color = 0;
+  max_bin_count = bins[0][0][0];
+  for (i = 0; i < BIN_SIZE; i++)
+    {
+      for (j = 0; j < BIN_SIZE; j++)
+        {
+          for (k = 0; k < BIN_SIZE; k++)
+            {
+              guint count;
+
+              count = bins[i][j][k];
+
+              if (count > max_bin_count)
+                {
+                  red   = i * 255 / BIN_SIZE;
+                  green = j * 255 / BIN_SIZE;
+                  blue  = k * 255 / BIN_SIZE;
+
+                  max_bin_color = (red << 16) | (green << 8) | blue;
+                  max_bin_count = count;
+                }
+            }
+        }
+    }
+
+  /* in the case that *all* pixels are unsuitable,
+   * fall back to a nice gray */
+  if (G_UNLIKELY (max_bin_count == 0))
+    return 0x6F6F80;
+
+  return max_bin_color;
+}
+
+#undef BIN_SIZE
+#undef ALPHA_THRESHOLD
+#undef SATURATION_THRESHOLD
+
+#define PROMINENT_ICON_COLOR_SIZE 64
+
+/**
+ * shell_app_get_prominent_icon_color_1:
+ * @app: A #ShellApp
+ *
+ * Scan over a small version of the app icon and try to find
+ * the most prominent hue inside it.
+ *
+ * Returns: (transfer full): the color
+ */
+ClutterColor *
+shell_app_get_prominent_icon_color (ShellApp *app)
+{
+  GdkPixbuf *pixbuf;
+  ClutterColor *color;
+
+  pixbuf = shell_app_grab_icon_pixbuf (app, PROMINENT_ICON_COLOR_SIZE, 0);
+  color = clutter_color_new (0, 0, 0, 0);
+
+  if (pixbuf)
+    {
+      /* Clutter expects a color in RGBA format so add the alpha channel. */
+      clutter_color_from_pixel (color,
+                                pixbuf_get_prominent_icon_color (pixbuf) << 8 | 0xFF);
+    }
+
+  return color;
+}
+
+#undef PROMINENT_ICON_COLOR_SIZE
+
 typedef struct {
   ShellApp *app;
   int size;

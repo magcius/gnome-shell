@@ -85,6 +85,8 @@ int shell_app_compare (ShellApp *app, ShellApp *other);
 
 void shell_app_update_window_actions (ShellApp *app, MetaWindow *window);
 
+ClutterColor *shell_app_get_prominent_icon_color (ShellApp *app);
+
 G_END_DECLS
 
 #endif /* __SHELL_APP_H__ */
