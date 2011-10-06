@@ -229,6 +229,50 @@ shell_app_create_icon_texture (ShellApp   *app,
   return ret;
 }
 
+static GdkPixbuf *
+shell_app_grab_icon_pixbuf (ShellApp          *app,
+                            guint              size,
+                            GtkIconLookupFlags flags)
+{
+  GIcon *icon;
+  GtkIconInfo *info;
+  GdkPixbuf *pixbuf;
+
+  if (!app->entry)
+    {
+      MetaWindow *window;
+
+      window = window_backed_app_get_window (app);
+      g_object_get (window, "icon", &pixbuf, NULL);
+      return pixbuf;
+    }
+
+  info = NULL;
+
+  icon = g_app_info_get_icon (G_APP_INFO (gmenu_tree_entry_get_app_info (app->entry)));
+  if (icon != NULL)
+    {
+      info = gtk_icon_theme_lookup_by_gicon (gtk_icon_theme_get_default (),
+                                             icon, size, flags);
+    }
+
+  if (info == NULL)
+    {
+      icon = g_themed_icon_new ("application-x-executable");
+      info = gtk_icon_theme_lookup_by_gicon (gtk_icon_theme_get_default (),
+                                             icon, size, flags);
+      g_object_unref (icon);
+    }
+
+  if (info == NULL)
+    return COGL_INVALID_HANDLE;
+
+  pixbuf = gtk_icon_info_load_icon (info, NULL);
+  gtk_icon_info_free (info);
+
+  return pixbuf;
+}
+
 typedef struct {
   ShellApp *app;
   int size;
@@ -241,9 +285,7 @@ shell_app_create_faded_icon_cpu (StTextureCache *cache,
                                  GError        **error)
 {
   CreateFadedIconData *data = datap;
-  ShellApp *app;
   GdkPixbuf *pixbuf;
-  int size;
   CoglHandle texture;
   gint width, height, rowstride;
   guint8 n_channels;
@@ -254,36 +296,8 @@ shell_app_create_faded_icon_cpu (StTextureCache *cache,
   guint pixbuf_byte_size;
   guint8 *orig_pixels;
   guint8 *pixels;
-  GIcon *icon;
-  GtkIconInfo *info;
 
-  app = data->app;
-  size = data->size;
-
-  info = NULL;
-
-  icon = g_app_info_get_icon (G_APP_INFO (gmenu_tree_entry_get_app_info (app->entry)));
-  if (icon != NULL)
-    {
-      info = gtk_icon_theme_lookup_by_gicon (gtk_icon_theme_get_default (),
-                                             icon, size,
-                                             GTK_ICON_LOOKUP_FORCE_SIZE);
-    }
-
-  if (info == NULL)
-    {
-      icon = g_themed_icon_new ("application-x-executable");
-      info = gtk_icon_theme_lookup_by_gicon (gtk_icon_theme_get_default (),
-                                             icon, size,
-                                             GTK_ICON_LOOKUP_FORCE_SIZE);
-      g_object_unref (icon);
-    }
-
-  if (info == NULL)
-    return COGL_INVALID_HANDLE;
-
-  pixbuf = gtk_icon_info_load_icon (info, NULL);
-  gtk_icon_info_free (info);
+  pixbuf = shell_app_grab_icon_pixbuf (data->app, data->size, GTK_ICON_LOOKUP_FORCE_SIZE);
 
   if (pixbuf == NULL)
     return COGL_INVALID_HANDLE;
