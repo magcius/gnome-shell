@@ -434,11 +434,6 @@ StTooltip StLabel {
     spacing: 12px;
 }
 
-.window-caption {
-    color: white;
-    spacing: 25px;
-}
-
 .workspace-controls {
     visible-width: 32px; /* Amount visible before hovering */
 }
@@ -469,10 +464,16 @@ StTooltip StLabel {
 .window-caption {
     background: rgba(0,0,0,0.8);
     border: 1px solid rgba(128,128,128,0.40);
-    border-radius: 10px;
-    font-size: 9pt;
-    padding: 2px 8px;
+    border-radius: 16px;
+    font-size: 10pt;
+    padding: 2px 8px 4px;
     -shell-caption-spacing: 4px;
+    color: white;
+    spacing: 6px;
+}
+
+.window-clone-colored-border {
+    border-radius: 15px;
 }
 
 .window-close {

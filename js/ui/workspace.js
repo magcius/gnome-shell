@@ -28,6 +28,8 @@ const CLOSE_BUTTON_FADE_TIME = 0.1;
 
 const DRAGGING_WINDOW_OPACITY = 100;
 
+const COLORED_BORDER_WIDTH = 30;
+
 const BUTTON_LAYOUT_SCHEMA = 'org.gnome.shell.overrides';
 const BUTTON_LAYOUT_KEY = 'button-layout';
 
@@ -101,8 +103,8 @@ WindowClone.prototype = {
 
         let [borderX, borderY] = this._getInvisibleBorderPadding();
         this._windowClone = new Clutter.Clone({ source: realWindow.get_texture(),
-                                                x: -borderX,
-                                                y: -borderY });
+                                                x: -borderX + COLORED_BORDER_WIDTH,
+                                                y: -borderY + COLORED_BORDER_WIDTH });
         // We expect this.actor to be used for all interaction rather than
         // this._windowClone; as the former is reactive and the latter
         // is not, this just works for most cases. However, for DND all
@@ -115,6 +117,21 @@ WindowClone.prototype = {
 
         let outerRect = realWindow.meta_window.get_outer_rect();
 
+        this._windowBorderGroup = new St.Group({ x: -COLORED_BORDER_WIDTH,
+                                                 y: -COLORED_BORDER_WIDTH,
+                                                 width: outerRect.width + COLORED_BORDER_WIDTH * 2,
+                                                 height: outerRect.height + COLORED_BORDER_WIDTH * 2,
+                                                 style_class: 'window-clone-colored-border' });
+
+        let app = Shell.WindowTracker.get_default().get_window_app(this.metaWindow);
+        let color = app.get_prominent_icon_color();
+
+        // ClutterColor.to_string() adds an extra alpha channel, chop that off
+        let style = 'border: %dpx solid %s'.format(COLORED_BORDER_WIDTH, color.to_string().slice(0, -2));
+        this._windowBorderGroup.set_style(style);
+
+        this._windowBorderGroup.add_actor(this._windowClone);
+
         // The MetaShapedTexture that we clone has a size that includes
         // the invisible border; this is inconvenient; rather than trying
         // to compensate all over the place we insert a ClutterGroup into
@@ -125,7 +142,7 @@ WindowClone.prototype = {
                                          width: outerRect.width,
                                          height: outerRect.height });
 
-        this.actor.add_actor(this._windowClone);
+        this.actor.add_actor(this._windowBorderGroup);
 
         this.actor._delegate = this;
 
@@ -439,10 +456,18 @@ WindowOverlay.prototype = {
         this._parentActor = parentActor;
         this._hidden = false;
 
-        let title = new St.Label({ style_class: 'window-caption',
-                                   text: metaWindow.title });
-        title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-        title._spacing = 0;
+        let title = new St.BoxLayout({ style_class: 'window-caption' });
+
+        let app = Shell.WindowTracker.get_default().get_window_app(metaWindow);
+        let icon = app.create_icon_texture(16);
+        title.add(icon, { y_fill: false,
+                          y_align: St.Align.END });
+
+        let titleText = new St.Label({ text: metaWindow.title });
+        titleText.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        titleText._spacing = 0;
+
+        title.add(titleText, { y_align: St.Align.MIDDLE });
 
         this._updateCaptionId = metaWindow.connect('notify::title',
             Lang.bind(this, function(w) {
