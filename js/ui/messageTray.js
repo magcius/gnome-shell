@@ -1150,25 +1150,9 @@ const SummaryItem = new Lang.Class({
                                      button_mask: St.ButtonMask.ONE | St.ButtonMask.TWO | St.ButtonMask.THREE,
                                      track_hover: true });
 
-        this._sourceBox = new St.BoxLayout({ style_class: 'summary-source' });
-
-        this._sourceIcon = source.getSummaryIcon();
-        this._sourceTitleBin = new St.Bin({ y_align: St.Align.MIDDLE,
-                                            x_fill: true,
-                                            clip_to_allocation: true });
-        this._sourceTitle = new St.Label({ style_class: 'source-title',
-                                           text: source.title });
-        this._sourceTitle.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
-        this._sourceTitleBin.child = this._sourceTitle;
-        this._sourceTitleBin.width = 0;
-
-        this.source.connect('title-changed',
-                            Lang.bind(this, function() {
-                                this._sourceTitle.text = source.title;
-                            }));
-
-        this._sourceBox.add(this._sourceIcon, { y_fill: false });
-        this._sourceBox.add(this._sourceTitleBin, { expand: true, y_fill: false });
+        this._sourceBox = new St.Bin({ style_class: 'summary-source',
+                                       child: source.getSummaryIcon(),
+                                       y_fill: false, });
         this.actor.child = this._sourceBox;
 
         this.notificationStackView = new St.ScrollView({ name: source.isChat ? '' : 'summary-notification-stack-scrollview',
@@ -1222,30 +1206,6 @@ const SummaryItem = new Lang.Class({
 
         let focusManager = St.FocusManager.get_for_stage(global.stage);
         focusManager.add_group(this.rightClickMenu);
-    },
-
-    // getTitleNaturalWidth, getTitleWidth, and setTitleWidth include
-    // the spacing between the icon and title (which is actually
-    // _sourceTitle's padding-left) as part of the width.
-
-    getTitleNaturalWidth: function() {
-        let [minWidth, naturalWidth] = this._sourceTitle.get_preferred_width(-1);
-
-        return Math.min(naturalWidth, MAX_SOURCE_TITLE_WIDTH);
-    },
-
-    getTitleWidth: function() {
-        return this._sourceTitleBin.width;
-    },
-
-    setTitleWidth: function(width) {
-        width = Math.round(width);
-        if (width != this._sourceTitleBin.width)
-            this._sourceTitleBin.width = width;
-    },
-
-    setEllipsization: function(mode) {
-        this._sourceTitle.clutter_text.ellipsize = mode;
     },
 
     prepareNotificationStackForShowing: function() {
@@ -1368,7 +1328,6 @@ const MessageTray = new Lang.Class({
         this._summaryBin.child = this._summary;
         this._summaryBin.opacity = 0;
 
-        this._summaryMotionId = 0;
         this._trayMotionId = 0;
 
         this._summaryBoxPointer = new BoxPointer.BoxPointer(St.Side.BOTTOM,
@@ -1383,16 +1342,21 @@ const MessageTray = new Lang.Class({
         this._summaryBoxPointerDoneDisplayingId = 0;
         this._clickedSummaryItem = null;
         this._clickedSummaryItemMouseButton = -1;
-        this._clickedSummaryItemAllocationChangedId = 0;
-        this._expandedSummaryItem = null;
-        this._summaryItemTitleWidth = 0;
         this._pointerBarrier = 0;
 
-        // To simplify the summary item animation code, we pretend
-        // that there's an invisible SummaryItem to the left of the
-        // leftmost real summary item, and that it's expanded when all
-        // of the other items are collapsed.
-        this._imaginarySummaryItemTitleWidth = 0;
+        this._sourceTitleBoxPointer = new BoxPointer.BoxPointer(St.Side.BOTTOM,
+                                                                { reactive: true,
+                                                                  track_hover: true });
+        this._sourceTitleBoxPointer.actor.add_style_class_name('source-title-boxpointer');
+        this.actor.add_actor(this._sourceTitleBoxPointer.actor);
+        this._sourceTitleBoxPointer.actor.lower_bottom();
+        this._sourceTitleBoxPointer.actor.hide();
+
+        this._sourceTitleLabel = new St.Label({ style_class: 'source-title' });
+        this._sourceTitleBoxPointer.bin.child = this._sourceTitleLabel;
+
+        this._sourceTitleShowing = false;
+        this._hoveredSummaryItem = null;
 
         this._focusGrabber = new FocusGrabber();
         this._focusGrabber.connect('focus-grabbed', Lang.bind(this,
@@ -1474,7 +1438,6 @@ const MessageTray = new Lang.Class({
         // are items in this list once the notifications are done showing or once an item gets
         // added to the summary without a notification being shown.
         this._newSummaryItems = [];
-        this._longestSummaryItem = null;
         this._chatSummaryItemsCount = 0;
     },
 
@@ -1523,14 +1486,6 @@ const MessageTray = new Lang.Class({
             this._chatSummaryItemsCount++;
         } else {
             this._summary.insert_actor(summaryItem.actor, this._chatSummaryItemsCount);
-        }
-
-        let titleWidth = summaryItem.getTitleNaturalWidth();
-        if (titleWidth > this._summaryItemTitleWidth) {
-            this._summaryItemTitleWidth = titleWidth;
-            if (!this._expandedSummaryItem)
-                this._imaginarySummaryItemTitleWidth = titleWidth;
-            this._longestSummaryItem = summaryItem;
         }
 
         this._summaryItems.push(summaryItem);
@@ -1592,27 +1547,12 @@ const MessageTray = new Lang.Class({
         if (source.isChat)
             this._chatSummaryItemsCount--;
 
-        if (this._expandedSummaryItem == summaryItemToRemove)
-            this._expandedSummaryItem = null;
-
-        if (this._longestSummaryItem.source == source) {
-            let newTitleWidth = 0;
-            this._longestSummaryItem = null;
-            for (let i = 0; i < this._summaryItems.length; i++) {
-                let summaryItem = this._summaryItems[i];
-                let titleWidth = summaryItem.getTitleNaturalWidth();
-                if (titleWidth > newTitleWidth) {
-                    newTitleWidth = titleWidth;
-                    this._longestSummaryItem = summaryItem;
-                }
-            }
-
-            this._summaryItemTitleWidth = newTitleWidth;
-            if (!this._expandedSummaryItem)
-                this._imaginarySummaryItemTitleWidth = newTitleWidth;
-        }
-
         let needUpdate = false;
+
+        if (this._hoveredSummaryItem == summaryItemToRemove) {
+            this._hoveredSummaryItem = null;
+            needUpdate = true;
+        }
 
         if (this._notification && this._notification.source == source) {
             this._updateNotificationTimeout(0);
@@ -1702,119 +1642,14 @@ const MessageTray = new Lang.Class({
     },
 
     _onSummaryItemHoverChanged: function(summaryItem) {
-        if (summaryItem.actor.hover)
-            this._setExpandedSummaryItem(summaryItem);
-    },
-
-    _setExpandedSummaryItem: function(summaryItem) {
-        if (summaryItem == this._expandedSummaryItem)
-            return;
-
-        // We can't just animate individual summary items as the
-        // pointer moves in and out of them, because if they don't
-        // move in sync you get weird-looking wobbling. So whenever
-        // there's a change, we have to re-tween the entire summary
-        // area.
-
-        // Turn off ellipsization for the previously expanded item that is
-        // collapsing and for the item that is expanding because it looks
-        // better that way.
-        if (this._expandedSummaryItem) {
-            // Ideally, we would remove 'expanded' pseudo class when the item
-            // is done collapsing, but we don't track when that happens.
-            this._expandedSummaryItem.actor.remove_style_pseudo_class('expanded');
-            this._expandedSummaryItem.setEllipsization(Pango.EllipsizeMode.NONE);
+        if (summaryItem.actor.hover) {
+            if (summaryItem != this._hoveredSummaryItem)
+                this._hoveredSummaryItem = summaryItem;
+        } else {
+            this._hoveredSummaryItem = null;
         }
 
-        this._expandedSummaryItem = summaryItem;
-        if (this._expandedSummaryItem) {
-            this._expandedSummaryItem.actor.add_style_pseudo_class('expanded');
-            this._expandedSummaryItem.setEllipsization(Pango.EllipsizeMode.NONE);
-        }
-
-        // We tween on a "_expandedSummaryItemTitleWidth" pseudo-property
-        // that represents the current title width of the
-        // expanded/expanding item, or the width of the imaginary
-        // invisible item if we're collapsing everything.
-        Tweener.addTween(this,
-                         { _expandedSummaryItemTitleWidth: this._summaryItemTitleWidth,
-                           time: ANIMATION_TIME,
-                           transition: 'easeOutQuad',
-                           onComplete: this._expandSummaryItemCompleted,
-                           onCompleteScope: this });
-    },
-
-    get _expandedSummaryItemTitleWidth() {
-        if (this._expandedSummaryItem)
-            return this._expandedSummaryItem.getTitleWidth();
-        else
-            return this._imaginarySummaryItemTitleWidth;
-    },
-
-    set _expandedSummaryItemTitleWidth(expansion) {
-        expansion = Math.round(expansion);
-
-        // Expand the expanding item to its new width
-        if (this._expandedSummaryItem)
-            this._expandedSummaryItem.setTitleWidth(expansion);
-        else
-            this._imaginarySummaryItemTitleWidth = expansion;
-
-        // Figure out how much space the other items are currently
-        // using, and how much they need to be shrunk to keep the
-        // total width (including the width of the imaginary item)
-        // constant.
-        let excess = this._summaryItemTitleWidth - expansion;
-        let oldExcess = 0, shrinkage;
-        if (excess) {
-            for (let i = 0; i < this._summaryItems.length; i++) {
-                if (this._summaryItems[i] != this._expandedSummaryItem)
-                    oldExcess += this._summaryItems[i].getTitleWidth();
-            }
-            if (this._expandedSummaryItem)
-                oldExcess += this._imaginarySummaryItemTitleWidth;
-        }
-        if (excess && oldExcess)
-            shrinkage = excess / oldExcess;
-        else
-            shrinkage = 0;
-
-        // Now shrink each one proportionately
-        for (let i = 0; i < this._summaryItems.length; i++) {
-            if (this._summaryItems[i] == this._expandedSummaryItem)
-                continue;
-
-            let oldWidth = this._summaryItems[i].getTitleWidth();
-            let newWidth = Math.floor(oldWidth * shrinkage);
-            excess -= newWidth;
-            this._summaryItems[i].setTitleWidth(newWidth);
-        }
-        if (this._expandedSummaryItem) {
-            let oldWidth = this._imaginarySummaryItemTitleWidth;
-            let newWidth = Math.floor(oldWidth * shrinkage);
-            excess -= newWidth;
-            this._imaginarySummaryItemTitleWidth = newWidth;
-        }
-
-        // If the tray as a whole is fully-expanded, make sure the
-        // left edge doesn't wobble during animation due to rounding.
-        if (this._imaginarySummaryItemTitleWidth == 0 && excess != 0) {
-            for (let i = 0; i < this._summaryItems.length; i++) {
-                if (this._summaryItems[i] == this._expandedSummaryItem)
-                    continue;
-
-                let oldWidth = this._summaryItems[i].getTitleWidth();
-                if (oldWidth != 0) {
-                    this._summaryItems[i].setTitleWidth (oldWidth + excess);
-                    break;
-                }
-            }
-        }
-    },
-
-    _expandSummaryItemCompleted: function() {
-        if (this._expandedSummaryItem)
-            this._expandedSummaryItem.setEllipsization(Pango.EllipsizeMode.END);
+        this._updateState();
     },
 
     _onSummaryItemClicked: function(summaryItem, button) {
@@ -1996,8 +1831,6 @@ const MessageTray = new Lang.Class({
         let summarySummoned = this._pointerInSummary || this._overviewVisible ||  this._traySummoned;
         let summaryPinned = this._summaryTimeoutId != 0 || this._pointerInTray || summarySummoned || this._locked;
         let summaryHovered = this._pointerInTray || this._pointerInSummary;
-        let summaryVisibleWithNoHover = (this._overviewVisible || this._locked) && !summaryHovered;
-        let summaryNotificationIsForExpandedSummaryItem = (this._clickedSummaryItem == this._expandedSummaryItem);
 
         let notificationsVisible = (this._notificationState == State.SHOWING ||
                                     this._notificationState == State.SHOWN);
@@ -2021,12 +1854,6 @@ const MessageTray = new Lang.Class({
         } else if (this._summaryState == State.SHOWN) {
             if (!summaryPinned || mustHideSummary)
                 this._hideSummary();
-            else if (summaryVisibleWithNoHover && !summaryNotificationIsForExpandedSummaryItem)
-                // If we are hiding the summary, we'll collapse the expanded summary item when we are done
-                // so that there is no animation. However, we should collapse the expanded summary item
-                // if the summary is visible, but not hovered over, and the summary notification for the
-                // expanded summary item is not being shown.
-                this._setExpandedSummaryItem(null);
         }
 
         // Summary notification
@@ -2062,6 +1889,14 @@ const MessageTray = new Lang.Class({
             this._showTray();
         else if (trayIsVisible && !trayShouldBeVisible)
             this._hideTray();
+
+        let isHiding = (this._summaryBoxPointerState == State.HIDING ||
+                        this._summaryBoxPointerState == State.HIDDEN);
+
+        if (this._hoveredSummaryItem != null && isHiding)
+            this._showSourceTitle();
+        else
+            this._hideSourceTitle();
     },
 
     _tween: function(actor, statevar, value, params) {
@@ -2306,7 +2141,8 @@ const MessageTray = new Lang.Class({
     },
 
     _hideSummaryCompleted: function() {
-        this._setExpandedSummaryItem(null);
+        this._hideSourceTitle();
+        this._hoveredSummaryItem = null;
     },
 
     _showSummaryBoxPointer: function() {
@@ -2315,6 +2151,7 @@ const MessageTray = new Lang.Class({
                                                                                       Lang.bind(this, this._onSummaryBoxPointerContentUpdated));
         this._summaryBoxPointerDoneDisplayingId = this._summaryBoxPointerItem.connect('done-displaying-content',
                                                                                       Lang.bind(this, this._escapeTray));
+
         if (this._clickedSummaryItemMouseButton == 1) {
             this._notificationQueue = this._notificationQueue.filter( Lang.bind(this,
                 function(notification) {
@@ -2433,6 +2270,26 @@ const MessageTray = new Lang.Class({
 
         if (this._clickedSummaryItem)
             this._updateState();
+    },
+
+    _showSourceTitle: function() {
+        this._sourceTitleLabel.text = this._hoveredSummaryItem.source.title;
+
+        if (!this._sourceTitleShowing) {
+            this._sourceTitleBoxPointer.actor.show();
+            this._sourceTitleBoxPointer.show(false);
+        }
+
+        this._sourceTitleBoxPointer.setPosition(this._hoveredSummaryItem.actor, 0, St.Align.MIDDLE);
+        this._sourceTitleShowing = true;
+    },
+
+    _hideSourceTitle: function() {
+        if (!this._sourceTitleShowing)
+            return;
+
+        this._sourceTitleShowing = false;
+        this._sourceTitleBoxPointer.hide(true);
     }
 });
 
