@@ -431,10 +431,18 @@ const WindowOverlay = new Lang.Class({
         this._parentActor = parentActor;
         this._hidden = false;
 
-        let title = new St.Label({ style_class: 'window-caption',
-                                   text: metaWindow.title });
-        title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-        title._spacing = 0;
+        let title = new St.BoxLayout({ style_class: 'window-caption' });
+
+        let app = Shell.WindowTracker.get_default().get_window_app(metaWindow);
+        let icon = app.create_icon_texture(16);
+        title.add(icon, { y_fill: false,
+                          y_align: St.Align.END });
+
+        let titleText = new St.Label({ text: metaWindow.title });
+        titleText.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        titleText._spacing = 0;
+
+        title.add(titleText, { y_align: St.Align.MIDDLE });
 
         this._updateCaptionId = metaWindow.connect('notify::title',
             Lang.bind(this, function(w) {
