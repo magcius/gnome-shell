@@ -4,12 +4,13 @@ const Clutter = imports.gi.Clutter;
 const GLib = imports.gi.GLib;
 const Gtk = imports.gi.Gtk;
 const GMenu = imports.gi.GMenu;
-const Shell = imports.gi.Shell;
 const Lang = imports.lang;
-const Signals = imports.signals;
-const Meta = imports.gi.Meta;
-const St = imports.gi.St;
 const Mainloop = imports.mainloop;
+const Meta = imports.gi.Meta;
+const Pango = imports.gi.Pango;
+const Shell = imports.gi.Shell;
+const Signals = imports.signals;
+const St = imports.gi.St;
 
 const AppFavorites = imports.ui.appFavorites;
 const DND = imports.ui.dnd;
@@ -606,6 +607,39 @@ const AppWellIcon = new Lang.Class({
 });
 Signals.addSignalMethods(AppWellIcon.prototype);
 
+const WindowPreviewMenuItem = new Lang.Class({
+    Name: 'WindowPreviewMenuItem',
+    Extends: PopupMenu.PopupBaseMenuItem,
+
+    _init: function(window, params) {
+        this.window = window;
+        params = Params.parse(params, { style_class: 'app-well-preview-menu-item' });
+
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+
+        let mutterWindow = window.get_compositor_private();
+        let windowTexture = mutterWindow.get_texture();
+        let [width, height] = windowTexture.get_size();
+
+        const size = 256;
+        let scale = Math.min(1.0, size / width);
+
+        let clone = new Clutter.Clone ({ source: windowTexture,
+                                         reactive: true,
+                                         width: width * scale,
+                                         height: height * scale });
+
+        let label = new St.Label({ text: window.get_title() });
+        let labelBin = new St.Bin({ child: label,
+                                    x_align: St.Align.MIDDLE });
+
+        let box = new St.BoxLayout({ vertical: true });
+        box.add(clone, { x_fill: false });
+        box.add(labelBin);
+        this.addActor(box, { expand: true });
+    }
+});
+
 const AppIconMenu = new Lang.Class({
     Name: 'AppIconMenu',
     Extends: PopupMenu.PopupMenu,
@@ -651,8 +685,8 @@ const AppIconMenu = new Lang.Class({
                 this._appendSeparator();
                 separatorShown = true;
             }
-            let item = this._appendMenuItem(windows[i].title);
-            item._window = windows[i];
+
+            this.addMenuItem(new WindowPreviewMenuItem(windows[i]));
         }
 
         if (!this._source.app.is_window_backed()) {
@@ -661,10 +695,10 @@ const AppIconMenu = new Lang.Class({
 
             let isFavorite = AppFavorites.getAppFavorites().isFavorite(this._source.app.get_id());
 
-            this._newWindowMenuItem = this._appendMenuItem(_("New Window"));
+            this._newWindowMenuItem = this._appendCenteredItem(_("New Window"));
             this._appendSeparator();
 
-            this._toggleFavoriteMenuItem = this._appendMenuItem(isFavorite ? _("Remove from Favorites")
+            this._toggleFavoriteMenuItem = this._appendCenteredItem(isFavorite ? _("Remove from Favorites")
                                                                 : _("Add to Favorites"));
         }
     },
@@ -674,9 +708,14 @@ const AppIconMenu = new Lang.Class({
         this.addMenuItem(separator);
     },
 
-    _appendMenuItem: function(labelText) {
+    _appendCenteredItem: function(labelText) {
         // FIXME: app-well-menu-item style
-        let item = new PopupMenu.PopupMenuItem(labelText);
+        // FIXME: PopupMenuItem should center for us.
+        let item = new PopupMenu.PopupBaseMenuItem();
+        let bin = new St.Bin({ child: new St.Label({ text: labelText }),
+                               x_align: St.Align.MIDDLE });
+
+        item.addActor(bin, { expand: true });
         this.addMenuItem(item);
         return item;
     },
@@ -687,8 +726,8 @@ const AppIconMenu = new Lang.Class({
     },
 
     _onActivate: function (actor, child) {
-        if (child._window) {
-            let metaWindow = child._window;
+        if (child.window) {
+            let metaWindow = child.window;
             this.emit('activate-window', metaWindow);
         } else if (child == this._newWindowMenuItem) {
             this._source.app.open_new_window(-1);
