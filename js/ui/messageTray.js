@@ -966,15 +966,17 @@ Notification.prototype = {
 };
 Signals.addSignalMethods(Notification.prototype);
 
-function Source(title) {
-    this._init(title);
+function Source(title, icon_name, icon_type) {
+    this._init(title, icon_name, icon_type);
 }
 
 Source.prototype = {
     ICON_SIZE: 24,
 
-    _init: function(title) {
+    _init: function(title, icon_name, icon_type) {
         this.title = title;
+        this.icon_name = icon_name;
+        this.icon_type = icon_type;
 
         this.actor = new Shell.GenericContainer();
         this.actor.connect('get-preferred-width', Lang.bind(this, this._getPreferredWidth));
@@ -1004,6 +1006,14 @@ Source.prototype = {
         this.isMuted = false;
 
         this.notifications = [];
+
+        try {
+            this._setSummaryIcon(this.createNotificationIcon());
+        } catch (e) {
+            // this.createNotificationIcon threw an error.
+            // This could be normal in the case of notificationDaemon, which
+            // calls _setSummaryIcon itself.
+        }
     },
 
     _getPreferredWidth: function (actor, forHeight, alloc) {
@@ -1074,10 +1084,12 @@ Source.prototype = {
     },
 
     // Called to create a new icon actor (of size this.ICON_SIZE).
-    // Must be overridden by the subclass if you do not pass icons
-    // explicitly to the Notification() constructor.
+    // Provides a sane default implementation, override if you need
+    // something more fancy.
     createNotificationIcon: function() {
-        throw new Error('no implementation of createNotificationIcon in ' + this);
+        return new St.Icon({ icon_name: this.icon_name,
+                             icon_type: this.icon_type,
+                             icon_size: this.ICON_SIZE });
     },
 
     // Unlike createNotificationIcon, this always returns the same actor;
@@ -1128,16 +1140,14 @@ Source.prototype = {
     },
 
     //// Protected methods ////
-
-    // The subclass must call this at least once to set the summary icon.
     _setSummaryIcon: function(icon) {
         if (this._iconBin.child)
             this._iconBin.child.destroy();
         this._iconBin.child = icon;
     },
 
-    // Default implementation is to do nothing, but subclasses can override
     open: function(notification) {
+        this.emit('opened', notification);
     },
 
     destroyNonResidentNotifications: function() {
