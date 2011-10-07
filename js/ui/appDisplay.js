@@ -530,7 +530,10 @@ AppWellIcon.prototype = {
         this._removeMenuTimeout();
 
         if (button == 1) {
-            this._onActivate(Clutter.get_current_event());
+            if (this.app.get_windows().length > 1)
+                this.popupMenu();
+            else
+                this._onActivate(Clutter.get_current_event());
         } else if (button == 2) {
             // Last workspace is always empty
             let launchWorkspace = global.screen.get_workspace_by_index(global.screen.n_workspaces - 1);
