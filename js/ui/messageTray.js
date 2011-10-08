@@ -2317,15 +2317,7 @@ SystemNotificationSource.prototype = {
     __proto__:  Source.prototype,
 
     _init: function() {
-        Source.prototype._init.call(this, _("System Information"));
-
-        this._setSummaryIcon(this.createNotificationIcon());
-    },
-
-    createNotificationIcon: function() {
-        return new St.Icon({ icon_name: 'dialog-information',
-                             icon_type: St.IconType.SYMBOLIC,
-                             icon_size: this.ICON_SIZE });
+        Source.prototype._init.call(this, _("System Information"), 'dialog-information', St.IconType.SYMBOLIC);
     },
 
     open: function() {

@@ -269,12 +269,12 @@ AutorunResidentSource.prototype = {
     __proto__: MessageTray.Source.prototype,
 
     _init: function() {
-        MessageTray.Source.prototype._init.call(this, _("Removable Devices"));
+        MessageTray.Source.prototype._init.call(this, _("Removable Devices"),
+                                                'media-removable', St.IconType.FULLCOLOR);
 
         this._mounts = [];
 
         this._notification = new AutorunResidentNotification(this);
-        this._setSummaryIcon(this.createNotificationIcon());
     },
 
     addMount: function(mount, apps) {
@@ -317,12 +317,6 @@ AutorunResidentSource.prototype = {
             Main.messageTray.add(this);
             this.pushNotification(this._notification);
         }
-    },
-
-    createNotificationIcon: function() {
-        return new St.Icon ({ icon_name: 'media-removable',
-                              icon_type: St.IconType.FULLCOLOR,
-                              icon_size: this.ICON_SIZE });
     }
 }
 
@@ -517,10 +511,10 @@ AutorunTransientSource.prototype = {
     __proto__: MessageTray.Source.prototype,
 
     _init: function(mount, apps) {
-        MessageTray.Source.prototype._init.call(this, mount.get_name());
-
         this.mount = mount;
         this.apps = apps;
+
+        MessageTray.Source.prototype._init.call(this, mount.get_name());
 
         this._notification = new AutorunTransientNotification(this);
         this._setSummaryIcon(this.createNotificationIcon());

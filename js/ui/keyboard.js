@@ -544,18 +544,11 @@ KeyboardSource.prototype = {
 
     _init: function(keyboard) {
         this._keyboard = keyboard;
-        MessageTray.Source.prototype._init.call(this, _("Keyboard"));
-
-        this._setSummaryIcon(this.createNotificationIcon());
+        MessageTray.Source.prototype._init.call(this, _("Keyboard"),
+                                                'input-keyboard', St.IconType.SYMBOLIC);
     },
 
-    createNotificationIcon: function() {
-        return new St.Icon({ icon_name: 'input-keyboard',
-                             icon_type: St.IconType.SYMBOLIC,
-                             icon_size: this.ICON_SIZE });
-    },
-
-     handleSummaryClick: function() {
+    handleSummaryClick: function() {
         let event = Clutter.get_current_event();
         if (event.type() != Clutter.EventType.BUTTON_RELEASE)
             return false;

@@ -53,10 +53,10 @@ Source.prototype = {
     __proto__ : MessageTray.Source.prototype,
 
     _init: function(app, window) {
-        MessageTray.Source.prototype._init.call(this, app.get_name());
-        this._window = window;
         this._app = app;
-        this._setSummaryIcon(this.createNotificationIcon());
+        this._window = window;
+
+        MessageTray.Source.prototype._init.call(this, app.get_name());
 
         this.signalIDs = [];
         this.signalIDs.push(this._window.connect('notify::demands-attention', Lang.bind(this, function() { this.destroy(); })));

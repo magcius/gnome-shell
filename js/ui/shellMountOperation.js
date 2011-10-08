@@ -251,6 +251,7 @@ ShellMountPasswordSource.prototype = {
         MessageTray.Source.prototype._init.call(this, strings[0]);
 
         this._notification = new ShellMountPasswordNotification(this, strings, icon, reaskPassword);
+        this._setSummaryIcon(icon);
 
         // add ourselves as a source, and popup the notification
         Main.messageTray.add(this);

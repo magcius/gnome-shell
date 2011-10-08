@@ -312,7 +312,7 @@ Indicator.prototype = {
 
     _ensureSource: function() {
         if (!this._source) {
-            this._source = new Source();
+            this._source = new MessageTray.Source(_("Bluetooth"), 'bluetooth-active', St.IconType.SYMBOLIC);
             Main.messageTray.add(this._source);
         }
     },
@@ -334,38 +334,6 @@ Indicator.prototype = {
 
     _cancelRequest: function() {
         this._source.destroy();
-    }
-}
-
-function Source() {
-    this._init.apply(this, arguments);
-}
-
-Source.prototype = {
-    __proto__: MessageTray.Source.prototype,
-
-    _init: function() {
-        MessageTray.Source.prototype._init.call(this, _("Bluetooth"));
-
-        this._setSummaryIcon(this.createNotificationIcon());
-    },
-
-    notify: function(notification) {
-        this._private_destroyId = notification.connect('destroy', Lang.bind(this, function(notification) {
-            if (this.notification == notification) {
-                // the destroyed notification is the last for this source
-                this.notification.disconnect(this._private_destroyId);
-                this.destroy();
-            }
-        }));
-
-        MessageTray.Source.prototype.notify.call(this, notification);
-    },
-
-    createNotificationIcon: function() {
-        return new St.Icon({ icon_name: 'bluetooth-active',
-                             icon_type: St.IconType.SYMBOLIC,
-                             icon_size: this.ICON_SIZE });
     }
 }
 

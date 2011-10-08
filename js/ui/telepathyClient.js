@@ -433,8 +433,9 @@ Client.prototype = {
 
     _ensureSubscriptionSource: function() {
         if (this._subscriptionSource == null) {
-            this._subscriptionSource = new MultiNotificationSource(
-                _("Subscription request"), 'gtk-dialog-question');
+            this._subscriptionSource = new MessageTray.Source(_("Subscription request"),
+                                                              'gtk-dialog-question',
+                                                              St.IconType.FULLCOLOR);
             Main.messageTray.add(this._subscriptionSource);
             this._subscriptionSource.connect('destroy', Lang.bind(this, function () {
                 this._subscriptionSource = null;
@@ -469,8 +470,9 @@ Client.prototype = {
 
     _ensureAccountSource: function() {
         if (this._accountSource == null) {
-            this._accountSource = new MultiNotificationSource(
-                _("Connection error"), 'gtk-dialog-error');
+            this._accountSource = new MessageTray.Source(_("Connection error"),
+                                                         'gtk-dialog-error',
+                                                         St.IconType.FULLCOLOR);
             Main.messageTray.add(this._accountSource);
             this._accountSource.connect('destroy', Lang.bind(this, function () {
                 this._accountSource = null;
@@ -489,13 +491,13 @@ ChatSource.prototype = {
     __proto__:  MessageTray.Source.prototype,
 
     _init: function(account, conn, channel, contact, client) {
-        MessageTray.Source.prototype._init.call(this, contact.get_alias());
-
         this.isChat = true;
 
         this._account = account;
         this._contact = contact;
         this._client = client;
+
+        MessageTray.Source.prototype._init.call(this, contact.get_alias());
 
         this._pendingMessages = [];
 
@@ -522,8 +524,6 @@ ChatSource.prototype = {
         this._sentId = this._channel.connect('message-sent', Lang.bind(this, this._messageSent));
         this._receivedId = this._channel.connect('message-received', Lang.bind(this, this._messageReceived));
         this._pendingId = this._channel.connect('pending-message-removed', Lang.bind(this, this._pendingRemoved));
-
-        this._setSummaryIcon(this.createNotificationIcon());
 
         this._notifyAliasId = this._contact.connect('notify::alias', Lang.bind(this, this._updateAlias));
         this._notifyAvatarId = this._contact.connect('notify::avatar-file', Lang.bind(this, this._updateAvatarIcon));
@@ -1093,18 +1093,15 @@ ChatNotification.prototype = {
     }
 };
 
-function ApproverSource(dispatchOp, text, gicon) {
-    this._init(dispatchOp, text, gicon);
+function ApproverSource(dispatchOp, text, icon_name) {
+    this._init(dispatchOp, text, icon_name);
 }
 
 ApproverSource.prototype = {
     __proto__: MessageTray.Source.prototype,
 
-    _init: function(dispatchOp, text, gicon) {
-        MessageTray.Source.prototype._init.call(this, text);
-
-        this._gicon = gicon;
-        this._setSummaryIcon(this.createNotificationIcon());
+    _init: function(dispatchOp, text, icon_name) {
+        MessageTray.Source.prototype._init.call(this, text, icon_name);
 
         this._dispatchOp = dispatchOp;
 
@@ -1123,14 +1120,8 @@ ApproverSource.prototype = {
         }
 
         MessageTray.Source.prototype.destroy.call(this);
-    },
-
-    createNotificationIcon: function() {
-        return new St.Icon({ gicon: this._gicon,
-                             icon_type: St.IconType.FULLCOLOR,
-                             icon_size: this.ICON_SIZE });
     }
-}
+};
 
 function RoomInviteNotification(source, dispatchOp, channel, inviter) {
     this._init(source, dispatchOp, channel, inviter);
@@ -1262,43 +1253,6 @@ FileTransferNotification.prototype = {
             }
             this.destroy();
         }));
-    }
-};
-
-// A notification source that can embed multiple notifications
-function MultiNotificationSource(title, icon) {
-    this._init(title, icon);
-}
-
-MultiNotificationSource.prototype = {
-    __proto__: MessageTray.Source.prototype,
-
-    _init: function(title, icon) {
-        MessageTray.Source.prototype._init.call(this, title);
-
-        this._icon = icon;
-        this._setSummaryIcon(this.createNotificationIcon());
-        this._nbNotifications = 0;
-    },
-
-    notify: function(notification) {
-        MessageTray.Source.prototype.notify.call(this, notification);
-
-        this._nbNotifications += 1;
-
-        // Display the source while there is at least one notification
-        notification.connect('destroy', Lang.bind(this, function () {
-            this._nbNotifications -= 1;
-
-            if (this._nbNotifications == 0)
-                this.destroy();
-        }));
-    },
-
-    createNotificationIcon: function() {
-        return new St.Icon({ gicon: Gio.icon_new_for_string(this._icon),
-                             icon_type: St.IconType.FULLCOLOR,
-                             icon_size: this.ICON_SIZE });
     }
 };
 
