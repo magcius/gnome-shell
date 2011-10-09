@@ -24,7 +24,7 @@
  * @short_description: A multi-child layout container based on rows
  * and columns
  *
- * #StTable is a mult-child layout container based on a table arrangement
+ * #StTable is a multi-child layout container based on a table arrangement
  * with rows and columns. #StTable adds several child properties to it's
  * children that control their position and size in the table.
  */
@@ -59,10 +59,25 @@ enum
 #define ST_TABLE_GET_PRIVATE(obj)    \
   (G_TYPE_INSTANCE_GET_PRIVATE ((obj), ST_TYPE_TABLE, StTablePrivate))
 
+typedef struct
+{
+  guint expand : 1;
+  guint shrink : 1;
+  guint is_visible : 1;
+
+  gfloat min_size;
+  gfloat pref_size;
+  gfloat final_size;
+
+} DimensionData;
+
 struct _StTablePrivate
 {
   gint    col_spacing;
   gint    row_spacing;
+
+  gint    visible_rows;
+  gint    visible_cols;
 
   gint    n_rows;
   gint    n_cols;
@@ -70,16 +85,8 @@ struct _StTablePrivate
   gint    active_row;
   gint    active_col;
 
-  GArray *min_widths;
-  GArray *pref_widths;
-  GArray *min_heights;
-  GArray *pref_heights;
-
-  GArray *is_expand_col;
-  GArray *is_expand_row;
-
-  GArray *col_widths;
-  GArray *row_heights;
+  GArray *columns;
+  GArray *rows;
 
   guint   homogeneous : 1;
 };
@@ -202,17 +209,8 @@ st_table_finalize (GObject *gobject)
 {
   StTablePrivate *priv = ST_TABLE (gobject)->priv;
 
-  g_array_free (priv->min_widths, TRUE);
-  g_array_free (priv->pref_widths, TRUE);
-
-  g_array_free (priv->min_heights, TRUE);
-  g_array_free (priv->pref_heights, TRUE);
-
-  g_array_free (priv->is_expand_col, TRUE);
-  g_array_free (priv->is_expand_row, TRUE);
-
-  g_array_free (priv->col_widths, TRUE);
-  g_array_free (priv->row_heights, TRUE);
+  g_array_free (priv->columns, TRUE);
+  g_array_free (priv->rows, TRUE);
 
   G_OBJECT_CLASS (st_table_parent_class)->finalize (gobject);
 }
@@ -288,39 +286,34 @@ st_table_homogeneous_allocate (ClutterActor          *self,
 }
 
 
-static gint *
+static void
 st_table_calculate_col_widths (StTable *table,
                                gint     for_width)
 {
-  gint total_min_width, i;
   StTablePrivate *priv = table->priv;
-  gboolean *is_expand_col;
-  gint extra_col_width, n_expanded_cols = 0, expanded_cols = 0;
-  gint *pref_widths, *min_widths;
   GList *list, *children;
+  gint i;
+  DimensionData *columns;
 
-  g_array_set_size (priv->is_expand_col, 0);
-  g_array_set_size (priv->is_expand_col, priv->n_cols);
-  is_expand_col = (gboolean *) priv->is_expand_col->data;
+  g_array_set_size (priv->columns, 0);
+  g_array_set_size (priv->columns, priv->n_cols);
+  columns = &g_array_index (priv->columns, DimensionData, 0);
 
-  g_array_set_size (priv->pref_widths, 0);
-  g_array_set_size (priv->pref_widths, priv->n_cols);
-  pref_widths = (gint *) priv->pref_widths->data;
 
-  g_array_set_size (priv->min_widths, 0);
-  g_array_set_size (priv->min_widths, priv->n_cols);
-  min_widths = (gint *) priv->min_widths->data;
+  /* Reset all the visible attributes for the columns */
+  priv->visible_cols = 0;
+  for (i = 0; i < priv->n_cols; i++)
+    columns[i].is_visible = FALSE;
 
   children = st_container_get_children_list (ST_CONTAINER (table));
 
+  /* STAGE ONE: calculate column widths for non-spanned children */
   for (list = children; list; list = list->next)
     {
-      gint col;
-      gfloat w_min, w_pref;
-      gboolean x_expand;
       StTableChild *meta;
       ClutterActor *child;
-      gint col_span;
+      DimensionData *col;
+      gfloat w_min, w_pref;
 
       child = CLUTTER_ACTOR (list->data);
 
@@ -329,242 +322,552 @@ st_table_calculate_col_widths (StTable *table,
       if (!meta->allocate_hidden && !CLUTTER_ACTOR_IS_VISIBLE (child))
         continue;
 
-      /* get child properties */
-      col = meta->col;
-      x_expand = meta->x_expand;
-      col_span = meta->col_span;
+      if (meta->col_span > 1)
+        continue;
 
-      if (x_expand)
-        is_expand_col[col] = TRUE;
+      col = &columns[meta->col];
+
+      /* If this child is visible, then its column is visible */
+      if (!col->is_visible)
+        {
+          col->is_visible = TRUE;
+          priv->visible_cols++;
+        }
 
       _st_actor_get_preferred_width (child, -1, meta->y_fill, &w_min, &w_pref);
-      if (col_span == 1 && w_pref > pref_widths[col])
+
+      col->min_size = MAX (col->min_size, w_min);
+      col->final_size = col->pref_size = MAX (col->pref_size, w_pref);
+      col->expand = MAX (col->expand, meta->x_expand);
+    }
+
+  /* STAGE TWO: take spanning children into account */
+  for (list = children; list; list = list->next)
+    {
+      StTableChild *meta;
+      ClutterActor *child;
+      gfloat w_min, w_pref;
+      gfloat min_width, pref_width;
+      gint start_col, end_col;
+      gint n_expand;
+
+      child = CLUTTER_ACTOR (list->data);
+
+      meta = (StTableChild *) clutter_container_get_child_meta (CLUTTER_CONTAINER (table), child);
+
+      if (!meta->allocate_hidden && !CLUTTER_ACTOR_IS_VISIBLE (child))
+        continue;
+
+      if (meta->col_span < 2)
+        continue;
+
+      start_col = meta->col;
+      end_col = meta->col + meta->col_span - 1;
+
+      _st_actor_get_preferred_width (child, -1, meta->y_fill, &w_min, &w_pref);
+
+
+      /* check there is enough room for this actor */
+      min_width = 0;
+      pref_width = 0;
+      n_expand = 0;
+      for (i = start_col; i <= end_col; i++)
         {
-          pref_widths[col] = w_pref;
+          min_width += columns[i].min_size;
+          pref_width += columns[i].pref_size;
+
+          if (columns[i].expand)
+            {
+              n_expand++;
+            }
+
+          /* If this child is visible, then the columns it spans
+             are also visible */
+          if (!columns[i].is_visible)
+            {
+              columns[i].is_visible = TRUE;
+              priv->visible_cols++;
+            }
+
+          columns[i].expand = MAX (columns[i].expand, meta->x_expand);
         }
-      if (col_span == 1 && w_min > min_widths[col])
+      min_width += priv->col_spacing * (meta->col_span - 1);
+      pref_width += priv->col_spacing * (meta->col_span - 1);
+
+
+      /* see st_table_calculate_row_heights() for comments */
+      /* (1) */
+      if (w_min > min_width)
         {
-          min_widths[col] = w_min;
+
+          /* (2) */
+          /* we can start from preferred width and decrease */
+          if (pref_width > w_min)
+            {
+              for (i = start_col; i <= end_col; i++)
+                {
+                  columns[i].final_size = columns[i].pref_size;
+                }
+
+              while (pref_width > w_min)
+                {
+                  for (i = start_col; i <= end_col; i++)
+                    {
+                      if (columns[i].final_size > columns[i].min_size)
+                        {
+                          columns[i].final_size--;
+                          pref_width--;
+                        }
+                    }
+                }
+              for (i = start_col; i <= end_col; i++)
+                {
+                  columns[i].min_size = columns[i].final_size;
+                }
+
+            }
+          else
+            {
+              /* (3) */
+              /* we can expand from preferred size */
+              gfloat expand_by;
+
+              expand_by = w_pref - pref_width;
+
+              for (i = start_col; i <= end_col; i++)
+                {
+                  if (n_expand)
+                    {
+                      if (columns[i].expand)
+                        columns[i].min_size =
+                          columns[i].pref_size + expand_by / n_expand;
+                    }
+                  else
+                    {
+                      columns[i].min_size =
+                        columns[i].pref_size + expand_by / meta->col_span;
+                    }
+
+                }
+            }
         }
+
 
     }
 
-  total_min_width = priv->col_spacing * (priv->n_cols - 1);
-  for (i = 0; i < priv->n_cols; i++)
-    total_min_width += pref_widths[i];
 
-  /* calculate the remaining space and distribute it evenly onto all rows/cols
-   * with the x/y expand property set. */
-  for (i = 0; i < priv->n_cols; i++)
-    if (is_expand_col[i])
-      {
-        expanded_cols += pref_widths[i];
-        n_expanded_cols++;
-      }
+  /* calculate final widths */
+  if (for_width >= 0)
+    {
+      gfloat min_width, pref_width;
+      gint n_expand;
 
-  /* for_width - total_min_width */
-  extra_col_width = for_width - total_min_width;
-  if (extra_col_width)
-    for (i = 0; i < priv->n_cols; i++)
-      if (is_expand_col[i])
+      min_width = 0;
+      pref_width = 0;
+      n_expand = 0;
+      for (i = 0; i < priv->n_cols; i++)
         {
-          if (extra_col_width < 0)
-            {
-              pref_widths[i] =
-                MAX (min_widths[i],
-                     pref_widths[i]
-                     + (extra_col_width * (pref_widths[i] / (float) expanded_cols)));
+          pref_width += columns[i].pref_size;
+          min_width += columns[i].min_size;
+          if (columns[i].expand)
+            n_expand++;
+        }
+      pref_width += priv->col_spacing * (priv->n_cols - 1);
+      min_width += priv->col_spacing * (priv->n_cols - 1);
 
-              /* if we reached the minimum width for this column, we need to
-               * stop counting it as expanded */
-              if (pref_widths[i] == min_widths[i])
-                {
-                  /* restart calculations :-( */
-                  expanded_cols -= pref_widths[i];
-                  is_expand_col[i] = 0;
-                  n_expanded_cols--;
-                  i = -1;
-                }
+      if (for_width <= min_width)
+        {
+          /* erk, we can't shrink this! */
+          for (i = 0; i < priv->n_cols; i++)
+            {
+              columns[i].final_size = columns[i].min_size;
             }
-          else
-            pref_widths[i] += extra_col_width / n_expanded_cols;
+          return;
         }
 
-  return pref_widths;
+      if (for_width == pref_width)
+        {
+          /* perfect! */
+          for (i = 0; i < priv->n_cols; i++)
+            {
+              columns[i].final_size = columns[i].pref_size;
+            }
+          return;
+        }
+
+      /* for_width is between min_width and pref_width */
+      if (for_width < pref_width && for_width > min_width)
+        {
+          gfloat width;
+
+          /* shrink columns until they reach min_width */
+
+          /* start with all columns at preferred size */
+          for (i = 0; i < priv->n_cols; i++)
+            {
+              columns[i].final_size = columns[i].pref_size;
+            }
+          width = pref_width;
+
+          while (width > for_width)
+            {
+              for (i = 0; i < priv->n_cols; i++)
+                {
+                  if (columns[i].final_size > columns[i].min_size)
+                    {
+                      columns[i].final_size--;
+                      width--;
+                    }
+                }
+            }
+
+          return;
+        }
+
+      /* expand columns */
+      if (for_width > pref_width)
+        {
+          gfloat extra_width = for_width - pref_width;
+          gint remaining;
+
+          if (n_expand)
+            remaining = (gint) extra_width % n_expand;
+          else
+            remaining = (gint) extra_width % priv->n_cols;
+
+          for (i = 0; i < priv->n_cols; i++)
+            {
+              if (columns[i].expand)
+                {
+                  if (n_expand)
+                    {
+                      columns[i].final_size =
+                        columns[i].pref_size + (extra_width / n_expand);
+                    }
+                  else
+                    {
+                      columns[i].final_size =
+                        columns[i].pref_size + (extra_width / priv->n_cols);
+                    }
+                }
+              else
+                columns[i].final_size = columns[i].pref_size;
+            }
+
+          /* distribute the remainder among children */
+          i = 0;
+          while (remaining)
+            {
+              columns[i].final_size++;
+              i++;
+              remaining--;
+            }
+        }
+    }
+
 }
 
-static gint *
+static void
 st_table_calculate_row_heights (StTable *table,
-                                gint     for_height,
-                                gint   * col_widths)
+                                gint     for_height)
 {
   StTablePrivate *priv = ST_TABLE (table)->priv;
   GList *list, *children;
-  gint *is_expand_row, *min_heights, *pref_heights, *row_heights, extra_row_height;
-  gint i, total_min_height;
-  gint expanded_rows = 0;
-  gint n_expanded_rows = 0;
+  gint i;
+  DimensionData *rows, *columns;
 
-  g_array_set_size (priv->row_heights, 0);
-  g_array_set_size (priv->row_heights, priv->n_rows);
-  row_heights = (gboolean *) priv->row_heights->data;
+  g_array_set_size (priv->rows, 0);
+  g_array_set_size (priv->rows, priv->n_rows);
+  rows = &g_array_index (priv->rows, DimensionData, 0);
 
-  g_array_set_size (priv->is_expand_row, 0);
-  g_array_set_size (priv->is_expand_row, priv->n_rows);
-  is_expand_row = (gboolean *) priv->is_expand_row->data;
+  columns = &g_array_index (priv->columns, DimensionData, 0);
 
-  g_array_set_size (priv->min_heights, 0);
-  g_array_set_size (priv->min_heights, priv->n_rows);
-  min_heights = (gboolean *) priv->min_heights->data;
+  /* Reset the visible rows */
+  priv->visible_rows = 0;
+  for (i = 0; i < priv->n_rows; i++)
+    rows[i].is_visible = FALSE;
 
-  g_array_set_size (priv->pref_heights, 0);
-  g_array_set_size (priv->pref_heights, priv->n_rows);
-  pref_heights = (gboolean *) priv->pref_heights->data;
-
+  /* STAGE ONE: calculate row heights for non-spanned children */
   children = st_container_get_children_list (ST_CONTAINER (table));
   for (list = children; list; list = list->next)
     {
-      gint row, col, cell_width;
-      gfloat h_min, h_pref;
-      gboolean y_expand;
       StTableChild *meta;
       ClutterActor *child;
-      gint col_span, row_span;
+      DimensionData *row;
+      gfloat c_min, c_pref;
 
       child = CLUTTER_ACTOR (list->data);
 
-      meta = (StTableChild *) clutter_container_get_child_meta (CLUTTER_CONTAINER (table), child);
+      meta = (StTableChild *)
+        clutter_container_get_child_meta (CLUTTER_CONTAINER (table), child);
 
       if (!meta->allocate_hidden && !CLUTTER_ACTOR_IS_VISIBLE (child))
         continue;
 
-      /* get child properties */
-      col = meta->col;
-      row = meta->row;
-      y_expand = meta->y_expand;
-      col_span = meta->col_span;
-      row_span = meta->row_span;
+      if (meta->row_span > 1)
+        continue;
 
-      if (y_expand)
-        is_expand_row[row] = TRUE;
+      row = &rows[meta->row];
 
-      /* calculate the cell width by including any spanned columns */
-      cell_width = 0;
-      for (i = 0; i < col_span && col + i < priv->n_cols; i++)
-        cell_width += (float)(col_widths[col + i]);
-
-      if (!meta->x_fill)
+      /* If this child is visible, then its row is visible */
+      if (!row->is_visible)
         {
-          gfloat width;
-          _st_actor_get_preferred_width (child, -1, meta->y_fill, NULL, &width);
-          cell_width = MIN (cell_width, width);
+          row->is_visible = TRUE;
+          priv->visible_rows++;
         }
 
-      _st_actor_get_preferred_height (child, cell_width, meta->x_fill,
-                                      &h_min, &h_pref);
+      _st_actor_get_preferred_height (child, columns[meta->col].final_size,
+                                      meta->x_fill, &c_min, &c_pref);
 
-      if (row_span == 1 && h_pref > pref_heights[row])
-        {
-          pref_heights[row] = (int)(h_pref);
-        }
-      if (row_span == 1 && h_min > min_heights[row])
-        {
-          min_heights[row] = (int)(h_min);
-        }
+      row->min_size = MAX (row->min_size, c_min);
+      row->final_size = row->pref_size = MAX (row->pref_size, c_pref);
+      row->expand = MAX (row->expand, meta->y_expand);
     }
 
-  total_min_height = 0; // priv->row_spacing * (priv->n_rows - 1);
-  for (i = 0; i < priv->n_rows; i++)
-    total_min_height += pref_heights[i];
-
-  /* calculate the remaining space and distribute it evenly onto all rows/cols
-   * with the x/y expand property set. */
-  for (i = 0; i < priv->n_rows; i++)
-    if (is_expand_row[i])
-      {
-        expanded_rows += pref_heights[i];
-        n_expanded_rows++;
-      }
-
-  /* extra row height = for height - row spacings - total_min_height */
-  for_height -= (priv->row_spacing * (priv->n_rows - 1));
-  extra_row_height = for_height - total_min_height;
 
 
-  if (extra_row_height < 0)
+  /* STAGE TWO: take spanning children into account */
+  for (list = children; list; list = list->next)
     {
-      gint *skip = g_slice_alloc0 (sizeof (gint) * priv->n_rows);
-      gint total_shrink_height;
+      StTableChild *meta;
+      ClutterActor *child;
+      gfloat c_min, c_pref;
+      gfloat min_height, pref_height;
+      gint start_row, end_row;
+      gint n_expand;
 
-      /* If we need to shrink rows, we need to do multiple passes.
+      child = CLUTTER_ACTOR (list->data);
+
+      meta = (StTableChild *)
+        clutter_container_get_child_meta (CLUTTER_CONTAINER (table), child);
+
+      if (!meta->allocate_hidden && !CLUTTER_ACTOR_IS_VISIBLE (child))
+        continue;
+
+      if (meta->row_span < 2)
+        continue;
+
+      start_row = meta->row;
+      end_row = meta->row + meta->row_span - 1;
+
+      _st_actor_get_preferred_height (child, columns[meta->col].final_size,
+                                      meta->x_fill, &c_min, &c_pref);
+
+
+      /* check there is enough room for this actor */
+      min_height = 0;
+      pref_height = 0;
+      n_expand = 0;
+      for (i = start_row; i <= end_row; i++)
+        {
+          min_height += rows[i].min_size;
+          pref_height += rows[i].pref_size;
+
+          if (rows[i].expand)
+            {
+              n_expand++;
+            }
+
+          /* If this actor is visible, then all the rows is spans are visible */
+          if (!rows[i].is_visible)
+            {
+              rows[i].is_visible = TRUE;
+              priv->visible_rows++;
+            }
+          rows[i].expand = MAX (rows[i].expand, meta->y_expand);
+        }
+      min_height += priv->row_spacing * (meta->row_span - 1);
+      pref_height += priv->row_spacing * (meta->row_span - 1);
+
+      /* 1) If the minimum height of the rows spanned is less than the minimum
+       * height of the child that is spanning them, then we must increase the
+       * minimum height of the rows spanned.
        *
-       * We start by assuming all rows can shrink. All rows are sized
-       * proportional to their height in the total table size. If a row would be
-       * sized smaller than its minimum size, we mark it as non-shrinkable, and
-       * reduce extra_row_height by the amount it has been shrunk. The amount
-       * it has been shrunk by is the difference between the preferred and
-       * minimum height, since all rows start at their preferred height. We
-       * also then reduce the total table size (stored in total_shrink_height) by the height
-       * of the row we are going to be skipping.
+       * 2) If the preferred height of the spanned rows is more that the minimum
+       * height of the spanning child, then we can start at this size and
+       * decrease each row evenly.
        *
+       * 3) If the preferred height of the rows is more than the minimum height
+       * of the spanned child, then we can start at the preferred height and
+       * expand.
        */
+      /* (1) */
+      if (c_min > min_height)
+        {
 
-      /* We start by assuming all rows can shrink */
-      total_shrink_height = total_min_height;
+          /* (2) */
+          /* we can start from preferred height and decrease */
+          if (pref_height > c_min)
+            {
+              for (i = start_row; i <= end_row; i++)
+                {
+                  rows[i].final_size = rows[i].pref_size;
+                }
+
+              while (pref_height > c_min)
+                {
+                  for (i = start_row; i <= end_row; i++)
+                    {
+                      if (rows[i].final_size > rows[i].min_size)
+                        {
+                          rows[i].final_size--;
+                          pref_height--;
+                        }
+                    }
+                }
+              for (i = start_row; i <= end_row; i++)
+                {
+                  rows[i].min_size = rows[i].final_size;
+                }
+
+            }
+          else
+            {
+              /* (3) */
+              /* we can expand from preferred size */
+              gfloat expand_by;
+
+              expand_by = c_pref - pref_height;
+
+              for (i = start_row; i <= end_row; i++)
+                {
+                  if (n_expand)
+                    {
+                      if (rows[i].expand)
+                        rows[i].min_size =
+                          rows[i].pref_size + expand_by / n_expand;
+                    }
+                  else
+                    {
+                      rows[i].min_size =
+                        rows[i].pref_size + expand_by / meta->row_span;
+                    }
+
+                }
+            }
+        }
+
+    }
+
+
+  /* calculate final heights */
+  if (for_height >= 0)
+    {
+      gfloat min_height, pref_height;
+      gint n_expand;
+
+      min_height = 0;
+      pref_height = 0;
+      n_expand = 0;
       for (i = 0; i < priv->n_rows; i++)
         {
-          if (!skip[i])
+          pref_height += rows[i].pref_size;
+          min_height += rows[i].min_size;
+          if (rows[i].expand)
+            n_expand++;
+        }
+      pref_height += priv->row_spacing * (priv->n_rows - 1);
+      min_height += priv->row_spacing * (priv->n_rows - 1);
+
+      if (for_height <= min_height)
+        {
+          /* erk, we can't shrink this! */
+          for (i = 0; i < priv->n_rows; i++)
             {
-              gint tmp;
+              rows[i].final_size = rows[i].min_size;
+            }
+          return;
+        }
 
-              /* Calculate the height of the row by starting with the preferred
-               * height and taking away the extra row height proportional to
-               * the preferred row height over the rows that are being shrunk
-               */
-              tmp = pref_heights[i]
-                    + (extra_row_height * (pref_heights[i] / (float) total_shrink_height));
+      if (for_height == pref_height)
+        {
+          /* perfect! */
+          for (i = 0; i < priv->n_rows; i++)
+            {
+              rows[i].final_size = rows[i].pref_size;
+            }
+          return;
+        }
 
-              if (tmp < min_heights[i])
+      /* for_height is between min_height and pref_height */
+      if (for_height < pref_height && for_height > min_height)
+        {
+          gfloat height;
+
+          /* shrink rows until they reach min_height */
+
+          /* start with all rows at preferred size */
+          for (i = 0; i < priv->n_rows; i++)
+            {
+              rows[i].final_size = rows[i].pref_size;
+            }
+          height = pref_height;
+
+          while (height > for_height)
+            {
+              for (i = 0; i < priv->n_rows; i++)
                 {
-                  /* This was a row we *were* set to shrink, but we now find it would have
-                   * been shrunk too much. We remove it from the list of rows to shrink and
-                   * adjust extra_row_height and total_shrink_height appropriately */
-                  skip[i] = TRUE;
-                  row_heights[i] = min_heights[i];
-
-                  /* Reduce extra_row_height by the amount we have reduced this
-                   * actor by */
-                  extra_row_height += (pref_heights[i] - min_heights[i]);
-                  /* now take off the row from the total shrink height */
-                  total_shrink_height -= pref_heights[i];
-
-                  /* restart the loop */
-                  i = -1;
-                }
-              else
-                {
-                  skip[i] = FALSE;
-                  row_heights[i] = tmp;
+                  if (rows[i].final_size > rows[i].min_size)
+                    {
+                      rows[i].final_size--;
+                      height--;
+                    }
                 }
             }
 
+          return;
         }
 
-      g_slice_free1 (sizeof (gint) * priv->n_rows, skip);
-    }
-  else
-    {
-      for (i = 0; i < priv->n_rows; i++)
+      /* expand rows */
+      if (for_height > pref_height)
         {
-          if (is_expand_row[i])
-            row_heights[i] = pref_heights[i] + (extra_row_height / n_expanded_rows);
+          gfloat extra_height = for_height - pref_height;
+          gint remaining;
+
+          if (n_expand)
+            remaining = (gint) extra_height % n_expand;
           else
-            row_heights[i] = pref_heights[i];
+            remaining = (gint) extra_height % priv->n_rows;
+
+          for (i = 0; i < priv->n_rows; i++)
+            {
+              if (rows[i].expand)
+                {
+                  if (n_expand)
+                    {
+                      rows[i].final_size =
+                        rows[i].pref_size + (extra_height / n_expand);
+                    }
+                  else
+                    {
+                      rows[i].final_size =
+                        rows[i].pref_size + (extra_height / priv->n_rows);
+                    }
+                }
+              else
+                rows[i].final_size = rows[i].pref_size;
+            }
+
+          /* distribute the remainder among children */
+          i = 0;
+          while (remaining)
+            {
+              rows[i].final_size++;
+              i++;
+              remaining--;
+            }
         }
     }
 
+}
 
-  return row_heights;
+static void
+st_table_calculate_dimensions (StTable *table,
+                               gfloat for_width,
+                               gfloat for_height)
+{
+  st_table_calculate_col_widths (table, for_width);
+  st_table_calculate_row_heights (table, for_height);
 }
 
 static void
@@ -575,10 +878,10 @@ st_table_preferred_allocate (ClutterActor          *self,
   GList *list, *children;
   gint row_spacing, col_spacing;
   gint i;
-  gint *col_widths, *row_heights;
   StTable *table;
   StTablePrivate *priv;
   gboolean ltr;
+  DimensionData *rows, *columns;
 
   table = ST_TABLE (self);
   priv = ST_TABLE (self)->priv;
@@ -586,16 +889,13 @@ st_table_preferred_allocate (ClutterActor          *self,
   col_spacing = (priv->col_spacing);
   row_spacing = (priv->row_spacing);
 
-  col_widths =
-    st_table_calculate_col_widths (table,
-                                   (int) (content_box->x2 - content_box->x1));
-
-  row_heights =
-    st_table_calculate_row_heights (table,
-                                    (int) (content_box->y2 - content_box->y1),
-                                    col_widths);
+  st_table_calculate_dimensions (table,
+                                 content_box->x2 - content_box->x1,
+                                 content_box->y2 - content_box->y1);
 
   ltr = (st_widget_get_direction (ST_WIDGET (self)) == ST_TEXT_DIRECTION_LTR);
+  rows = &g_array_index (priv->rows, DimensionData, 0);
+  columns = &g_array_index (priv->columns, DimensionData, 0);
 
   children = st_container_get_children_list (ST_CONTAINER (self));
   for (list = children; list; list = list->next)
@@ -626,10 +926,9 @@ st_table_preferred_allocate (ClutterActor          *self,
       x_fill = meta->x_fill;
       y_fill = meta->y_fill;
 
-
       /* initialise the width and height */
-      col_width = col_widths[col];
-      row_height = row_heights[row];
+      col_width = columns[col].final_size;
+      row_height = rows[row].final_size;
 
       /* Add the widths of the spanned columns:
        *
@@ -640,16 +939,17 @@ st_table_preferred_allocate (ClutterActor          *self,
        * want to add as much spacing as times we successfully span.
        */
       if (col + col_span > priv->n_cols)
-        g_warning ("StTable: col-span exceeds number of columns");
-#if 0
+        g_warning ("StTable: the child at %d,%d's col-span, %d, exceeds number of columns, %d",
+                   col, row, col_span, priv->n_cols);
       if (row + row_span > priv->n_rows)
-        g_warning ("StTable: row-span exceeds number of rows");
-#endif
+        g_warning ("StTable: the child at %d,%d's row-span, %d, exceeds number of rows, %d",
+                   col, row, row_span, priv->n_rows);
+
       if (col_span > 1)
         {
           for (i = col + 1; i < col + col_span && i < priv->n_cols; i++)
             {
-              col_width += col_widths[i];
+              col_width += columns[i].final_size;
               col_width += col_spacing;
             }
         }
@@ -659,7 +959,7 @@ st_table_preferred_allocate (ClutterActor          *self,
         {
           for (i = row + 1; i < row + row_span && i < priv->n_rows; i++)
             {
-              row_height += row_heights[i];
+              row_height += rows[i].final_size;
               row_height += row_spacing;
             }
         }
@@ -670,21 +970,21 @@ st_table_preferred_allocate (ClutterActor          *self,
           child_x = (int) content_box->x1
                     + col_spacing * col;
           for (i = 0; i < col; i++)
-            child_x += col_widths[i];
+            child_x += columns[i].final_size;
         }
       else
         {
           child_x = (int) content_box->x2
                     - col_spacing * col;
           for (i = 0; i < col; i++)
-            child_x -= col_widths[i];
+            child_x -= columns[i].final_size;
         }
 
       /* calculate child y */
       child_y = (int) content_box->y1
                 + row_spacing * row;
       for (i = 0; i < row; i++)
-        child_y += row_heights[i];
+        child_y += rows[i].final_size;
 
       /* set up childbox */
       if (ltr)
@@ -739,12 +1039,11 @@ st_table_get_preferred_width (ClutterActor *self,
                               gfloat       *min_width_p,
                               gfloat       *natural_width_p)
 {
-  gint *min_widths, *pref_widths;
   gfloat total_min_width, total_pref_width;
   StTablePrivate *priv = ST_TABLE (self)->priv;
   StThemeNode *theme_node = st_widget_get_theme_node (ST_WIDGET (self));
-  GList *list, *children;
   gint i;
+  DimensionData *columns;
 
   if (priv->n_cols < 1)
     {
@@ -753,52 +1052,19 @@ st_table_get_preferred_width (ClutterActor *self,
       return;
     }
 
-  /* Setting size to zero and then what we want it to be causes a clear if
-   * clear flag is set (which it should be.)
-   */
-  g_array_set_size (priv->min_widths, 0);
-  g_array_set_size (priv->pref_widths, 0);
-  g_array_set_size (priv->min_widths, priv->n_cols);
-  g_array_set_size (priv->pref_widths, priv->n_cols);
+  /* use min_widths to help allocation of height-for-width widgets */
+  st_table_calculate_dimensions (ST_TABLE (self), -1, for_height);
 
-  min_widths = (gint *) priv->min_widths->data;
-  pref_widths = (gint *) priv->pref_widths->data;
+  columns = &g_array_index (priv->columns, DimensionData, 0);
 
-  /* calculate minimum row widths */
-  children = st_container_get_children_list (ST_CONTAINER (self));
-  for (list = children; list; list = list->next)
-    {
-      gint col, col_span;
-      gfloat w_min, w_pref;
-      StTableChild *meta;
-      ClutterActor *child;
-
-      child = CLUTTER_ACTOR (list->data);
-
-      meta = (StTableChild *) clutter_container_get_child_meta (CLUTTER_CONTAINER (self), child);
-
-      if (!meta->allocate_hidden && !CLUTTER_ACTOR_IS_VISIBLE (child))
-        continue;
-
-      /* get child properties */
-      col = meta->col;
-      col_span = meta->col_span;
-
-      _st_actor_get_preferred_width (child, -1, meta->y_fill, &w_min, &w_pref);
-
-      if (col_span == 1 && w_min > min_widths[col])
-        min_widths[col] = w_min;
-      if (col_span == 1 && w_pref > pref_widths[col])
-        pref_widths[col] = w_pref;
-    }
-
-  total_min_width = (priv->n_cols - 1) * (float) priv->col_spacing;
+  /* start off with row spacing */
+  total_min_width = (priv->visible_cols - 1) * (float)(priv->col_spacing);
   total_pref_width = total_min_width;
 
   for (i = 0; i < priv->n_cols; i++)
     {
-      total_min_width += min_widths[i];
-      total_pref_width += pref_widths[i];
+      total_min_width += columns[i].min_size;
+      total_pref_width += columns[i].pref_size;
     }
 
   /* If we were requested width-for-height, then we reported minimum/natural
@@ -823,13 +1089,11 @@ st_table_get_preferred_height (ClutterActor *self,
                                gfloat       *min_height_p,
                                gfloat       *natural_height_p)
 {
-  gint *min_heights, *pref_heights;
   gfloat total_min_height, total_pref_height;
   StTablePrivate *priv = ST_TABLE (self)->priv;
   StThemeNode *theme_node = st_widget_get_theme_node (ST_WIDGET (self));
-  GList *list, *children;
   gint i;
-  gint *min_widths;
+  DimensionData *rows;
 
   /* We only support height-for-width allocation. So if we are called
    * width-for-height, calculate heights based on our natural width
@@ -851,63 +1115,19 @@ st_table_get_preferred_height (ClutterActor *self,
 
   st_theme_node_adjust_for_width (theme_node, &for_width);
 
-  /* Setting size to zero and then what we want it to be causes a clear if
-   * clear flag is set (which it should be.)
-   */
-  g_array_set_size (priv->min_heights, 0);
-  g_array_set_size (priv->pref_heights, 0);
-  g_array_set_size (priv->min_heights, priv->n_rows);
-  g_array_set_size (priv->pref_heights, priv->n_rows);
-
   /* use min_widths to help allocation of height-for-width widgets */
-  min_widths = st_table_calculate_col_widths (ST_TABLE (self), for_width);
+  st_table_calculate_dimensions (ST_TABLE (self), for_width, -1);
 
-  min_heights = (gint *) priv->min_heights->data;
-  pref_heights = (gint *) priv->pref_heights->data;
-
-  /* calculate minimum row heights */
-  children = st_container_get_children_list (ST_CONTAINER (self));
-  for (list = children; list; list = list->next)
-    {
-      gint row, col, col_span, cell_width, row_span;
-      gfloat min, pref;
-      StTableChild *meta;
-      ClutterActor *child;
-
-      child = CLUTTER_ACTOR (list->data);
-
-      meta = (StTableChild *) clutter_container_get_child_meta (CLUTTER_CONTAINER (self), child);
-
-      if (!meta->allocate_hidden && !CLUTTER_ACTOR_IS_VISIBLE (child))
-        continue;
-
-      /* get child properties */
-      row = meta->row;
-      col = meta->col;
-      col_span = meta->col_span;
-      row_span = meta->row_span;
-
-      cell_width = 0;
-      for (i = 0; i < col_span && col + i < priv->n_cols; i++)
-        cell_width += min_widths[col + i];
-
-      _st_actor_get_preferred_height (child, (float) cell_width, meta->x_fill,
-                                      &min, &pref);
-
-      if (row_span == 1 && min > min_heights[row])
-        min_heights[row] = min;
-      if (row_span == 1 && pref > pref_heights[row])
-        pref_heights[row] = pref;
-    }
+  rows = &g_array_index (priv->rows, DimensionData, 0);
 
   /* start off with row spacing */
-  total_min_height = (priv->n_rows - 1) * (float) (priv->row_spacing);
+  total_min_height = (priv->visible_rows - 1) * (float)(priv->row_spacing);
   total_pref_height = total_min_height;
 
   for (i = 0; i < priv->n_rows; i++)
     {
-      total_min_height += min_heights[i];
-      total_pref_height += pref_heights[i];
+      total_min_height += rows[i].min_size;
+      total_pref_height += rows[i].pref_size;
     }
 
   if (min_height_p)
@@ -1058,32 +1278,8 @@ st_table_init (StTable *table)
   table->priv->n_cols = 0;
   table->priv->n_rows = 0;
 
-  table->priv->min_widths = g_array_new (FALSE,
-                                         TRUE,
-                                         sizeof (gint));
-  table->priv->pref_widths = g_array_new (FALSE,
-                                          TRUE,
-                                          sizeof (gint));
-  table->priv->min_heights = g_array_new (FALSE,
-                                          TRUE,
-                                          sizeof (gint));
-  table->priv->pref_heights = g_array_new (FALSE,
-                                           TRUE,
-                                           sizeof (gint));
-
-  table->priv->is_expand_col = g_array_new (FALSE,
-                                            TRUE,
-                                            sizeof (gboolean));
-  table->priv->is_expand_row = g_array_new (FALSE,
-                                            TRUE,
-                                            sizeof (gboolean));
-
-  table->priv->col_widths = g_array_new (FALSE,
-                                         TRUE,
-                                         sizeof (gint));
-  table->priv->row_heights = g_array_new (FALSE,
-                                          TRUE,
-                                          sizeof (gint));
+  table->priv->columns = g_array_new (FALSE, TRUE, sizeof (DimensionData));
+  table->priv->rows = g_array_new (FALSE, TRUE, sizeof (DimensionData));
 }
 
 /* used by StTableChild to update row/column count */

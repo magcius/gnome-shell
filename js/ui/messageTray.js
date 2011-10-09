@@ -464,18 +464,9 @@ Notification.prototype = {
         this._bannerBox.connect('allocate', Lang.bind(this, this._bannerBoxAllocate));
         this._table.add(this._bannerBox, { row: 0,
                                            col: 1,
-                                           col_span: 2,
                                            x_expand: false,
                                            y_expand: false,
                                            y_fill: false });
-
-        // This is an empty cell that overlaps with this._bannerBox cell to ensure
-        // that this._bannerBox cell expands horizontally, while not forcing the
-        // this._imageBin that is also in col: 2 to expand horizontally.
-        this._table.add(new St.Bin(), { row: 0,
-                                        col: 2,
-                                        y_expand: false,
-                                        y_fill: false });
 
         this._titleLabel = new St.Label();
         this._bannerBox.add_actor(this._titleLabel);
@@ -601,7 +592,8 @@ Notification.prototype = {
                                                vscrollbar_policy: this._scrollPolicy,
                                                hscrollbar_policy: Gtk.PolicyType.NEVER });
         this._table.add(this._scrollArea, { row: 1,
-                                            col: 2 });
+                                            col: 2,
+                                            x_expand: true });
         this._updateLastColumnSettings();
         this._contentArea = new St.BoxLayout({ name: 'notification-body',
                                                vertical: true });
@@ -680,6 +672,7 @@ Notification.prototype = {
             props = {};
         props.row = 2;
         props.col = 2;
+        props.x_expand = true;
 
         this._table.add_style_class_name('multi-line-notification');
         this._table.add(this._actionArea, props);
