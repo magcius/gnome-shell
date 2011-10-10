@@ -407,8 +407,6 @@ Signals.addSignalMethods(FocusGrabber.prototype);
 const Notification = new Lang.Class({
     Name: 'Notification',
 
-    IMAGE_SIZE: 125,
-
     _init: function(source, title, banner, params) {
         this.source = source;
         this.title = title;
@@ -693,11 +691,11 @@ const Notification = new Lang.Class({
     setImage: function(image) {
         if (this._imageBin)
             this.unsetImage();
-        this._imageBin = new St.Bin();
+        this._imageBin = new St.Bin({ style_class: 'notification-image-bin',
+                                      y_fill: true });
         this._imageBin.child = image;
         this._imageBin.opacity = 230;
         this._table.add_style_class_name('multi-line-notification');
-        this._table.add_style_class_name('notification-with-image');
         this._addBannerBody();
         this._updateLastColumnSettings();
         this._table.add(this._imageBin, { row: 1,
@@ -711,9 +709,7 @@ const Notification = new Lang.Class({
 
     unsetImage: function() {
         if (this._imageBin) {
-            this._table.remove_style_class_name('notification-with-image');
-            this._table.remove_actor(this._imageBin);
-            this._imageBin = null;
+            this._imageBin.destroy();
             this._updateLastColumnSettings();
             if (!this._scrollArea && !this._actionArea)
                 this._table.remove_style_class_name('multi-line-notification');

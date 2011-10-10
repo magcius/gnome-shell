@@ -1760,7 +1760,6 @@ st_texture_cache_load_from_data (StTextureCache    *cache,
  * @width: width in pixels of @data
  * @height: width in pixels of @data
  * @rowstride: rowstride of @data
- * @size: size of icon to return
  *
  * Creates (or retrieves from cache) an icon based on raw pixel data.
  *
@@ -1775,7 +1774,6 @@ st_texture_cache_load_from_raw (StTextureCache    *cache,
                                 int                width,
                                 int                height,
                                 int                rowstride,
-                                int                size,
                                 GError           **error)
 {
   ClutterTexture *texture;
@@ -1784,7 +1782,7 @@ st_texture_cache_load_from_raw (StTextureCache    *cache,
   char *checksum;
 
   texture = create_default_texture (cache);
-  clutter_actor_set_size (CLUTTER_ACTOR (texture), size, size);
+  clutter_actor_set_size (CLUTTER_ACTOR (texture), width, height);
 
   /* In theory, two images of with different width and height could have the same
    * pixel data and thus hash the same. (Say, a 16x16 and a 8x32 blank image.)
