@@ -362,13 +362,11 @@ NotificationDaemon.prototype = {
             let image = null;
             if (hints['image-data']) {
                 let [width, height, rowStride, hasAlpha,
-                 bitsPerSample, nChannels, data] = hints['image-data'];
-                image = St.TextureCache.get_default().load_from_raw(data, hasAlpha,
-                                                                    width, height, rowStride, notification.IMAGE_SIZE);
+                     bitsPerSample, nChannels, data] = hints['image-data'];
+                image = St.TextureCache.get_default().load_from_raw(data, hasAlpha, width, height, rowStride);
             } else if (hints['image-path']) {
                 image = St.TextureCache.get_default().load_uri_async(GLib.filename_to_uri(hints['image-path'], null),
-                                                                     notification.IMAGE_SIZE,
-                                                                     notification.IMAGE_SIZE);
+                                                                     -1, -1);
             }
             notification.setImage(image);
         } else {

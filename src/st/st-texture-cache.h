@@ -137,7 +137,6 @@ ClutterActor *st_texture_cache_load_from_raw  (StTextureCache    *cache,
                                                int                width,
                                                int                height,
                                                int                rowstride,
-                                               int                size,
                                                GError           **error);
 
 /**
