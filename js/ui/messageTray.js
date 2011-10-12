@@ -430,7 +430,6 @@ Notification.prototype = {
         this._titleFitsInBannerMode = true;
         this._titleDirection = St.TextDirection.NONE;
         this._spacing = 0;
-        this._scrollPolicy = Gtk.PolicyType.AUTOMATIC;
         this._imageBin = null;
 
         source.connect('destroy', Lang.bind(this,
@@ -512,12 +511,11 @@ Notification.prototype = {
         // We always clear the content area if we don't have custom
         // content because it might contain the @banner that didn't
         // fit in the banner mode.
-        if (this._scrollArea && (!this._customContent || params.clear)) {
-            if (oldFocus && this._scrollArea.contains(oldFocus))
+        if (this._contentArea && (!this._customContent || params.clear)) {
+            if (oldFocus && this._contentArea.contains(oldFocus))
                 this.actor.grab_key_focus();
 
-            this._scrollArea.destroy();
-            this._scrollArea = null;
+            this._contentArea.destroy();
             this._contentArea = null;
         }
         if (this._actionArea && params.clear) {
@@ -531,7 +529,7 @@ Notification.prototype = {
         if (this._imageBin && params.clear)
             this.unsetImage();
 
-        if (!this._scrollArea && !this._actionArea && !this._imageBin)
+        if (!this._contentArea && !this._actionArea && !this._imageBin)
             this._table.remove_style_class_name('multi-line-notification');
 
         if (!this._icon) {
@@ -586,27 +584,17 @@ Notification.prototype = {
         this._icon.visible = visible;
     },
 
-    enableScrolling: function(enableScrolling) {
-        this._scrollPolicy = enableScrolling ? Gtk.PolicyType.AUTOMATIC : Gtk.PolicyType.NEVER;
-        if (this._scrollArea)
-            this._scrollArea.vscrollbar_policy = this._scrollPolicy;
-    },
-
-    _createScrollArea: function() {
+    _createContentArea: function() {
         this._table.add_style_class_name('multi-line-notification');
-        this._scrollArea = new St.ScrollView({ name: 'notification-scrollview',
-                                               vscrollbar_policy: this._scrollPolicy,
-                                               hscrollbar_policy: Gtk.PolicyType.NEVER,
-                                               style_class: 'vfade' });
-        this._table.add(this._scrollArea, { row: 1,
-                                            col: 2 });
-        this._updateLastColumnSettings();
         this._contentArea = new St.BoxLayout({ name: 'notification-body',
                                                vertical: true });
-        this._scrollArea.add_actor(this._contentArea);
+        this._table.add(this._contentArea, { row: 1,
+                                             col: 2,
+                                             x_expand: true });
         // If we know the notification will be expandable, we need to add
         // the banner text to the body as the first element.
         this._addBannerBody();
+        this._updateLastColumnSettings();
     },
 
     // addActor:
@@ -614,9 +602,8 @@ Notification.prototype = {
     //
     // Appends @actor to the notification's body
     addActor: function(actor, style) {
-        if (!this._scrollArea) {
-            this._createScrollArea();
-        }
+        if (!this._contentArea)
+            this._createContentArea();
 
         this._contentArea.add(actor, style ? style : {});
         this._updated();
@@ -643,18 +630,6 @@ Notification.prototype = {
             this._bannerBodyText = null;
             this.addBody(text, this._bannerBodyMarkup);
         }
-    },
-
-    // scrollTo:
-    // @side: St.Side.TOP or St.Side.BOTTOM
-    //
-    // Scrolls the content area (if scrollable) to the indicated edge
-    scrollTo: function(side) {
-        let adjustment = this._scrollArea.vscroll.adjustment;
-        if (side == St.Side.TOP)
-            adjustment.value = adjustment.lower;
-        else if (side == St.Side.BOTTOM)
-            adjustment.value = adjustment.upper;
     },
 
     // setActionArea:
@@ -686,9 +661,9 @@ Notification.prototype = {
     },
 
     _updateLastColumnSettings: function() {
-        if (this._scrollArea)
-            this._table.child_set(this._scrollArea, { col: this._imageBin ? 2 : 1,
-                                                      col_span: this._imageBin ? 1 : 2 });
+        if (this._contentArea)
+            this._table.child_set(this._contentArea, { col: this._imageBin ? 2 : 1,
+                                                       col_span: this._imageBin ? 1 : 2 });
         if (this._actionArea)
             this._table.child_set(this._actionArea, { col: this._imageBin ? 2 : 1,
                                                       col_span: this._imageBin ? 1 : 2 });
@@ -718,7 +693,7 @@ Notification.prototype = {
             this._table.remove_actor(this._imageBin);
             this._imageBin = null;
             this._updateLastColumnSettings();
-            if (!this._scrollArea && !this._actionArea)
+            if (!this._contentArea && !this._actionArea)
                 this._table.remove_style_class_name('multi-line-notification');
         }
     },
@@ -1257,7 +1232,6 @@ SummaryItem.prototype = {
             if (notification.actor.get_parent() == this.notificationStack)
                 this.notificationStack.remove_actor(notification.actor);
             notification.setIconVisible(true);
-            notification.enableScrolling(true);
         }
         this._stackedNotifications = [];
     },
@@ -1274,8 +1248,6 @@ SummaryItem.prototype = {
         stackedNotification.notificationDoneDisplayingId = notification.connect('done-displaying', Lang.bind(this, this._notificationDoneDisplaying));
         stackedNotification.notificationDestroyedId = notification.connect('destroy', Lang.bind(this, this._notificationDestroyed));
         this._stackedNotifications.push(stackedNotification);
-        if (!this.source.isChat)
-            notification.enableScrolling(false);
         if (this.notificationStack.get_children().length > 0)
             notification.setIconVisible(false);
         this.notificationStack.add(notification.actor);
@@ -1340,6 +1312,19 @@ MessageTray.prototype = {
         this.actor.connect('notify::hover', Lang.bind(this, this._onTrayHoverChanged));
 
         this._notificationBin = new St.Bin();
+
+        this._notificationScrollBin = new St.Bin({ name: 'notification-bin' });
+        this._notificationScrollView = new St.ScrollView({ name: 'notification-scrollview',
+                                                           vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
+                                                           hscrollbar_policy: Gtk.PolicyType.NEVER,
+                                                           style_class: 'vfade' });
+
+        // Use an St.BoxLayout because it is currently the only scrollable container.
+        this._notificationBoxLayout = new St.BoxLayout();
+        this._notificationScrollView.add_actor(this._notificationBoxLayout);
+        this._notificationScrollBin.child = this._notificationScrollView;
+        this._notificationBin.child = this._notificationScrollBin;
+
         this.actor.add_actor(this._notificationBin);
         this._notificationBin.hide();
         this._notificationQueue = [];
@@ -2065,7 +2050,7 @@ MessageTray.prototype = {
         this._notification = this._notificationQueue.shift();
         this._notificationClickedId = this._notification.connect('done-displaying',
                                                                  Lang.bind(this, this._escapeTray));
-        this._notificationBin.child = this._notification.actor;
+        this._notificationBoxLayout.add_actor(this._notification.actor);
 
         this._notificationBin.opacity = 0;
         this._notificationBin.y = this.actor.height;
@@ -2178,7 +2163,8 @@ MessageTray.prototype = {
     _hideNotificationCompleted: function() {
         this._notificationRemoved = false;
         this._notificationBin.hide();
-        this._notificationBin.child = null;
+        if (this._notification.actor.mapped)
+            this._notificationBoxLayout.remove_actor(this._notification.actor);
         this._notification.collapseCompleted();
         this._notification.disconnect(this._notificationClickedId);
         this._notificationClickedId = 0;

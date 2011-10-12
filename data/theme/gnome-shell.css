@@ -1145,11 +1145,14 @@ StTooltip StLabel {
     color: white;
 }
 
-#notification {
-    font-size: 11pt;
+#notification-bin {
     border-radius: 10px 10px 0px 0px;
     background: rgba(0,0,0,0.8);
     padding: 8px 8px 4px 8px;
+}
+
+#notification {
+    font-size: 11pt;
     spacing-rows: 10px;
     spacing-columns: 10px;
     width: 34em;
@@ -1177,9 +1180,8 @@ StTooltip StLabel {
     color: white;
 }
 
-.summary-boxpointer #notification {
-    border-radius: 9px;
-    background: rgba(0,0,0,0) !important;
+.summary-boxpointer .notification {
+    background: none !important;
     padding-bottom: 12px;
 }
 
