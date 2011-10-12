@@ -442,7 +442,7 @@ Notification.prototype = {
         this.actor.connect('clicked', Lang.bind(this, this._onClicked));
         this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
 
-        this._table = new St.Table({ name: 'notification',
+        this._table = new St.Table({ style_class: 'notification',
                                      reactive: true });
         this._table.connect('style-changed', Lang.bind(this, this._styleChanged));
         this.actor.set_child(this._table);
@@ -586,7 +586,7 @@ Notification.prototype = {
 
     _createContentArea: function() {
         this._table.add_style_class_name('multi-line-notification');
-        this._contentArea = new St.BoxLayout({ name: 'notification-body',
+        this._contentArea = new St.BoxLayout({ style_class: 'notification-body',
                                                vertical: true });
         this._table.add(this._contentArea, { row: 1,
                                              col: 2,
@@ -711,7 +711,7 @@ Notification.prototype = {
     addButton: function(id, label) {
         if (!this._buttonBox) {
 
-            let box = new St.BoxLayout({ name: 'notification-actions' });
+            let box = new St.BoxLayout({ style_class: 'notification-actions' });
             this.setActionArea(box, { x_expand: false,
                                       y_expand: false,
                                       x_fill: false,
@@ -1314,10 +1314,9 @@ MessageTray.prototype = {
         this._notificationBin = new St.Bin();
 
         this._notificationScrollBin = new St.Bin({ name: 'notification-bin' });
-        this._notificationScrollView = new St.ScrollView({ name: 'notification-scrollview',
+        this._notificationScrollView = new St.ScrollView({ style_class: 'notification-scrollview vfade',
                                                            vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
-                                                           hscrollbar_policy: Gtk.PolicyType.NEVER,
-                                                           style_class: 'vfade' });
+                                                           hscrollbar_policy: Gtk.PolicyType.NEVER });
 
         // Use an St.BoxLayout because it is currently the only scrollable container.
         this._notificationBoxLayout = new St.BoxLayout();
