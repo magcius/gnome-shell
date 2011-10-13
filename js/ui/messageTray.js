@@ -2162,7 +2162,7 @@ MessageTray.prototype = {
     _hideNotificationCompleted: function() {
         this._notificationRemoved = false;
         this._notificationBin.hide();
-        if (this._notification.actor.mapped)
+        if (this._notification.actor.get_parent() == this._notificationBoxLayout)
             this._notificationBoxLayout.remove_actor(this._notification.actor);
         this._notification.collapseCompleted();
         this._notification.disconnect(this._notificationClickedId);
