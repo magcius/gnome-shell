@@ -37,11 +37,6 @@ let contactFeatures = [Tp.ContactFeature.ALIAS,
                         Tp.ContactFeature.AVATAR_DATA,
                         Tp.ContactFeature.PRESENCE];
 
-// This is GNOME Shell's implementation of the Telepathy 'Client'
-// interface. Specifically, the shell is a Telepathy 'Observer', which
-// lets us see messages even if they belong to another app (eg,
-// Empathy).
-
 function makeMessageFromTpMessage(tpMessage, direction) {
     let [text, flags] = tpMessage.to_text();
 
