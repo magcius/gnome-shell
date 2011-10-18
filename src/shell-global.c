@@ -33,7 +33,6 @@
 #include "shell-enum-types.h"
 #include "shell-global-private.h"
 #include "shell-jsapi-compat-private.h"
-#include "shell-marshal.h"
 #include "shell-perf-log.h"
 #include "shell-window-tracker.h"
 #include "shell-wm.h"
@@ -310,8 +309,7 @@ shell_global_class_init (ShellGlobalClass *klass)
                     G_TYPE_FROM_CLASS (klass),
                     G_SIGNAL_RUN_LAST,
                     0,
-                    NULL, NULL,
-                    _shell_marshal_VOID__INT_INT,
+                    NULL, NULL, NULL,
                     G_TYPE_NONE, 2, G_TYPE_INT, G_TYPE_INT);
 
   /* Emitted from gnome-shell-plugin.c during event handling */
@@ -320,8 +318,7 @@ shell_global_class_init (ShellGlobalClass *klass)
                     G_TYPE_FROM_CLASS (klass),
                     G_SIGNAL_RUN_LAST,
                     0,
-                    NULL, NULL,
-                    g_cclosure_marshal_VOID__VOID,
+                    NULL, NULL, NULL,
                     G_TYPE_NONE, 0);
 
   /* Emitted from gnome-shell-plugin.c during event handling */
@@ -330,8 +327,7 @@ shell_global_class_init (ShellGlobalClass *klass)
                     G_TYPE_FROM_CLASS (klass),
                     G_SIGNAL_RUN_LAST,
                     0,
-                    NULL, NULL,
-                    g_cclosure_marshal_VOID__VOID,
+                    NULL, NULL, NULL,
                     G_TYPE_NONE, 0);
 
   shell_global_signals[NOTIFY_ERROR] =
@@ -339,8 +335,7 @@ shell_global_class_init (ShellGlobalClass *klass)
                     G_TYPE_FROM_CLASS (klass),
                     G_SIGNAL_RUN_LAST,
                     0,
-                    NULL, NULL,
-                    gi_cclosure_marshal_generic,
+                    NULL, NULL, NULL,
                     G_TYPE_NONE, 2,
                     G_TYPE_STRING,
                     G_TYPE_STRING);
