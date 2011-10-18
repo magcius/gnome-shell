@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 const Clutter = imports.gi.Clutter;
+const Equations = imports.tweener.equations;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Lang = imports.lang;
@@ -508,11 +509,15 @@ WindowManager.prototype = {
 
         switchData.movingWindowBin.raise_top();
 
+        const switchStart = 0.1;
+        const dipEnd = switchStart / WINDOW_ANIMATION_TIME;
+
         Tweener.addTween(switchData.outGroup,
                          { x: xDest,
                            y: yDest,
-                           time: WINDOW_ANIMATION_TIME,
-                           transition: 'easeOutQuad',
+                           delay: switchStart,
+                           time: WINDOW_ANIMATION_TIME - switchStart,
+                           transition: 'easeOutSine',
                            onComplete: this._switchWorkspaceDone,
                            onCompleteScope: this,
                            onCompleteParams: [shellwm]
@@ -520,9 +525,24 @@ WindowManager.prototype = {
         Tweener.addTween(switchData.inGroup,
                          { x: 0,
                            y: 0,
-                           time: WINDOW_ANIMATION_TIME,
-                           transition: 'easeOutQuad'
+                           delay: switchStart,
+                           time: WINDOW_ANIMATION_TIME - switchStart,
+                           transition: 'easeOutSine'
                          });
+
+        Tweener.addTween(switchData.movingWindowBin,
+                         { y: -yDest / 2,
+                           time: WINDOW_ANIMATION_TIME,
+                           transition: function(t, b, c, d) {
+                               // We want the moving bin to "dip down" and then rise up
+
+                               let time = t / d;
+                               if (time < dipEnd)
+                                   return Equations.easeOutQuad(t, b, c, d * dipEnd);
+
+                               return Equations.easeInQuad((time - dipEnd), b + c, -c, 1.0 - dipEnd);
+                           } });
+
     },
 
     _switchWorkspaceDone : function(shellwm) {
