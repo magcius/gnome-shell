@@ -520,8 +520,10 @@ st_widget_style_changed (StWidget *widget)
       widget->priv->theme_node = NULL;
     }
 
-  /* update the style only if we are mapped */
-  if (CLUTTER_ACTOR_IS_MAPPED (CLUTTER_ACTOR (widget)))
+  /* update the style only if we are on the stage. during a reparent, we are
+   * mapped but don't have a parent. */
+  if (CLUTTER_ACTOR_IS_MAPPED (CLUTTER_ACTOR (widget)) &&
+      clutter_actor_get_parent (CLUTTER_ACTOR (widget)))
     st_widget_recompute_style (widget, old_theme_node);
 
   if (old_theme_node)
