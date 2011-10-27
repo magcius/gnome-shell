@@ -129,8 +129,7 @@ const ContentTypeDiscoverer = new Lang.Class({
                 apps.push(app);
         });
 
-        if (apps.length == 0)
-            apps.push(Gio.app_info_get_default_for_type('inode/directory', false));
+        apps.push(Gio.app_info_get_default_for_type('inode/directory', false));
 
         this._callback(mount, apps, contentTypes);
     }
