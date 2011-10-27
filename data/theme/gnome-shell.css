@@ -1157,7 +1157,7 @@ StTooltip StLabel {
     color: white;
 }
 
-#notification {
+.notification {
     font-size: 11pt;
     border-radius: 10px 10px 0px 0px;
     background: rgba(0,0,0,0.8);
@@ -1167,11 +1167,11 @@ StTooltip StLabel {
     width: 34em;
 }
 
-#notification.multi-line-notification {
+.notification.multi-line-notification {
     padding-bottom: 8px;
 }
 
-#notification .notification-image-bin {
+.notification .notification-image-bin {
     max-width: 125px;
     max-height: 125px;
 }
@@ -1186,7 +1186,7 @@ StTooltip StLabel {
     color: white;
 }
 
-.summary-boxpointer #notification {
+.summary-boxpointer .notification {
     border-radius: 9px;
     background: rgba(0,0,0,0) !important;
     padding-bottom: 12px;
@@ -1204,10 +1204,6 @@ StTooltip StLabel {
     padding-bottom: 6px;
 }
 
-#summary-notification-stack-scrollview > .top-shadow, #summary-notification-stack-scrollview > .bottom-shadow {
-    height: 1em;
-}
-
 #summary-notification-stack-scrollview:ltr {
     padding-right: 8px;
 }
@@ -1216,28 +1212,24 @@ StTooltip StLabel {
     padding-left: 8px;
 }
 
-#notification-scrollview {
+.notification-scrollview {
     max-height: 10em;
     -st-vfade-offset: 24px;
 }
 
-#notification-scrollview > .top-shadow, #notification-scrollview > .bottom-shadow {
-    height: 1em;
-}
-
-#notification-scrollview:ltr > StScrollBar {
+.notification-scrollview:ltr > StScrollBar {
     padding-left: 6px;
 }
 
-#notification-scrollview:rtl > StScrollBar {
+.notification-scrollview:rtl > StScrollBar {
     padding-right: 6px;
 }
 
-#notification-body {
+.notification-body {
     spacing: 5px;
 }
 
-#notification-actions {
+.notification-actions {
     spacing: 10px;
 }
 
@@ -1366,7 +1358,7 @@ StTooltip StLabel {
     font-style: italic;
 }
 
-#notification StEntry {
+.notification StEntry {
     padding: 4px;
     border-radius: 4px;
     color: #a8a8a8;
@@ -1382,7 +1374,7 @@ StTooltip StLabel {
     caret-size: 1px;
 }
 
-#notification StEntry:focus {
+.notification StEntry:focus {
     border: 1px solid #8b8b8b;
     color: #333333;
     background-gradient-direction: vertical;
