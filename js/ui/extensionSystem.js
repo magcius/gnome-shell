@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 const Lang = imports.lang;
+const Gettext = imports.gettext;
 const Signals = imports.signals;
 
 const Clutter = imports.gi.Clutter;
@@ -401,6 +402,9 @@ function loadExtension(dir, type, enabled) {
         logExtensionError(uuid, 'missing \'init\' function');
         return;
     }
+
+    Gettext.bindtextdomain(uuid, dir.get_child('locale').get_path());
+    Object.defineProperty(meta, 'locale', { value: Gettext.domain(uuid) });
 
     try {
         extensionState = extensionModule.init(meta);
