@@ -398,39 +398,46 @@ function loadExtension(dir, type, enabled) {
         return;
     }
 
-    if (!extensionModule.init) {
-        logExtensionError(uuid, 'missing \'init\' function');
-        return;
-    }
-
-    Gettext.bindtextdomain(uuid, dir.get_child('locale').get_path());
-    Object.defineProperty(meta, 'locale', { value: Gettext.domain(uuid) });
+    Gio.Settings.push_schema_dir(dir.get_path());
 
     try {
-        extensionState = extensionModule.init(meta);
-    } catch (e) {
-        if (stylesheetPath != null)
-            theme.unload_stylesheet(stylesheetPath);
-        logExtensionError(uuid, 'Failed to evaluate init function:' + e);
-        return;
+        if (!extensionModule.init) {
+            logExtensionError(uuid, 'missing \'init\' function');
+            return;
+        }
+
+        Gettext.bindtextdomain(uuid, dir.get_child('locale').get_path());
+        Object.defineProperty(meta, 'locale', { value: Gettext.domain(uuid) });
+
+        try {
+            extensionState = extensionModule.init(meta);
+        } catch (e) {
+            if (stylesheetPath != null)
+                theme.unload_stylesheet(stylesheetPath);
+            logExtensionError(uuid, 'Failed to evaluate init function:' + e);
+            return;
+        }
+
+        if (!extensionState)
+            extensionState = extensionModule;
+        extensionStateObjs[uuid] = extensionState;
+
+        if (!extensionState.enable) {
+            logExtensionError(uuid, 'missing \'enable\' function');
+            return;
+        }
+        if (!extensionState.disable) {
+            logExtensionError(uuid, 'missing \'disable\' function');
+            return;
+        }
+
+        meta.state = ExtensionState.DISABLED;
+
+        enableExtension(uuid);
+
+    } finally {
+        Gio.Settings.pop_schema_dir();
     }
-
-    if (!extensionState)
-        extensionState = extensionModule;
-    extensionStateObjs[uuid] = extensionState;
-
-    if (!extensionState.enable) {
-        logExtensionError(uuid, 'missing \'enable\' function');
-        return;
-    }
-    if (!extensionState.disable) {
-        logExtensionError(uuid, 'missing \'disable\' function');
-        return;
-    }
-
-    meta.state = ExtensionState.DISABLED;
-
-    enableExtension(uuid);
 
     _signals.emit('extension-loaded', meta.uuid);
     _signals.emit('extension-state-changed', meta);
