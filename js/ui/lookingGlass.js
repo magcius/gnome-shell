@@ -899,6 +899,7 @@ LookingGlass.prototype = {
 
         this.actor = new St.BoxLayout({ name: 'LookingGlassDialog',
                                         style_class: 'lg-dialog',
+                                        opacity: 0,
                                         vertical: true,
                                         visible: false });
         this.actor.connect('key-press-event', Lang.bind(this, this._globalKeyPressEvent));
@@ -908,11 +909,7 @@ LookingGlass.prototype = {
                                         Lang.bind(this, this._updateFont));
         this._updateFont();
 
-        // We want it to appear to slide out from underneath the panel
-        Main.layoutManager.panelBox.add_actor(this.actor);
-        this.actor.lower_bottom();
-        Main.layoutManager.panelBox.connect('allocation-changed',
-                                            Lang.bind(this, this._queueResize));
+        Main.layoutManager.addChrome(this.actor, { visibleInFullscreen: true });
         Main.layoutManager.keyboardBox.connect('allocation-changed',
                                                Lang.bind(this, this._queueResize));
 
@@ -1150,14 +1147,12 @@ LookingGlass.prototype = {
         let availableHeight = primary.height - Main.layoutManager.keyboardBox.height;
         let myHeight = Math.min(primary.height * 0.7, availableHeight * 0.9);
         this.actor.x = (primary.width - myWidth) / 2;
-        this._hiddenY = this.actor.get_parent().height - myHeight - 4; // -4 to hide the top corners
-        this._targetY = this._hiddenY + myHeight;
-        this.actor.y = this._hiddenY;
+        this.actor.y = (primary.height - myHeight) / 2;
         this.actor.width = myWidth;
         this.actor.height = myHeight;
         this._objInspector.actor.set_size(Math.floor(myWidth * 0.8), Math.floor(myHeight * 0.8));
         this._objInspector.actor.set_position(this.actor.x + Math.floor(myWidth * 0.1),
-                                              this._targetY + Math.floor(myHeight * 0.1));
+                                              this.actor.y + Math.floor(myHeight * 0.1));
     },
 
     insertObject: function(obj) {
@@ -1210,7 +1205,7 @@ LookingGlass.prototype = {
         // through LookingGlass without long waits.
         Tweener.addTween(this.actor, { time: 0.5 / St.get_slow_down_factor(),
                                        transition: 'easeOutQuad',
-                                       y: this._targetY
+                                       opacity: 255,
                                      });
     },
 
@@ -1233,7 +1228,7 @@ LookingGlass.prototype = {
 
         Tweener.addTween(this.actor, { time: 0.5 / St.get_slow_down_factor(),
                                        transition: 'easeOutQuad',
-                                       y: this._hiddenY,
+                                       opacity: 0,
                                        onComplete: Lang.bind(this, function () {
                                            this.actor.hide();
                                        })
