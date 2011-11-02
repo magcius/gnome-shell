@@ -1175,7 +1175,7 @@ const LookingGlass = new Lang.Class({
         if (this._open)
             return;
 
-        if (!Main.pushModal(this._entry))
+        if (!Main.pushModal(this.actor))
             return;
 
         this._notebook.selectIndex(0);
@@ -1208,7 +1208,7 @@ const LookingGlass = new Lang.Class({
             this._borderPaintTarget = null;
         }
 
-        Main.popModal(this._entry);
+        Main.popModal(this.actor);
 
         Tweener.addTween(this.actor, { time: 0.5 / St.get_slow_down_factor(),
                                        transition: 'easeOutQuad',
