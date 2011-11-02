@@ -1929,7 +1929,6 @@ const PopupMenuManager = new Lang.Class({
         this._activeMenu = null;
         this._menus = [];
         this._menuStack = [];
-        this._preGrabInputMode = null;
         this._grabbedFromKeynav = false;
     },
 
@@ -2026,7 +2025,6 @@ const PopupMenuManager = new Lang.Class({
 
         if (open) {
             if (!this.grabbed) {
-                this._preGrabInputMode = global.stage_input_mode;
                 this._grabbedFromKeynav = hadFocus;
                 this._grab();
             }
@@ -2041,8 +2039,6 @@ const PopupMenuManager = new Lang.Class({
             this._activeMenu = null;
 
             if (this._grabbedFromKeynav) {
-                if (this._preGrabInputMode == Shell.StageInputMode.FOCUSED)
-                    global.stage_input_mode = Shell.StageInputMode.FOCUSED;
                 if (hadFocus && menu.sourceActor)
                     menu.sourceActor.grab_key_focus();
                 else if (focus)
