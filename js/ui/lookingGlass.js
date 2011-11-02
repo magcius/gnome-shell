@@ -175,8 +175,6 @@ const Notebook = new Lang.Class({
     },
 
     selectIndex: function(index) {
-        if (index == this._selectedIndex)
-            return;
         if (index < 0) {
             this._unselect();
             this.emit('selection', null);
@@ -187,6 +185,9 @@ const Notebook = new Lang.Class({
         let tabData = this._tabs[index];
         if (!tabData.scrollView.navigate_focus(null, Gtk.DirectionType.TAB_FORWARD, false))
             this.actor.grab_key_focus();
+
+        if (index == this._selectedIndex)
+            return;
 
         this._unselect();
 
