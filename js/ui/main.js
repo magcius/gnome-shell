@@ -667,6 +667,8 @@ function pushModal(actor, timestamp, options) {
         }
     }
 
+    let inputMode = global.stage_input_mode;
+
     global.set_stage_input_mode(Shell.StageInputMode.FULLSCREEN);
 
     modalCount += 1;
@@ -685,6 +687,7 @@ function pushModal(actor, timestamp, options) {
         });
     }
     modalActorFocusStack.push({ actor: actor,
+                                inputMode: inputMode,
                                 focus: curFocus,
                                 destroyId: actorDestroyId,
                                 focusDestroyId: curFocusDestroyId });
@@ -744,7 +747,7 @@ function popModal(actor, timestamp) {
         return;
 
     global.end_modal(timestamp);
-    global.set_stage_input_mode(Shell.StageInputMode.NORMAL);
+    global.set_stage_input_mode(record.inputMode);
 }
 
 function createLookingGlass() {

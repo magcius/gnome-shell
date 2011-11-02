@@ -714,14 +714,11 @@ Overview.prototype = {
                 Main.popModal(this._group);
                 this._modal = false;
             }
-            global.stage_input_mode = Shell.StageInputMode.FULLSCREEN;
         } else {
             if (this._modal) {
                 Main.popModal(this._group);
                 this._modal = false;
             }
-            else if (global.stage_input_mode == Shell.StageInputMode.FULLSCREEN)
-                global.stage_input_mode = Shell.StageInputMode.NORMAL;
         }
     },
 
