@@ -96,6 +96,12 @@ function _createGDMSession() {
                         });
 }
 
+function _initLookingGlass() {
+    global.screen.connect('show-looking-glass', function() {
+        createLookingGlass().open();
+    });
+}
+
 function _initRecorder() {
     let recorderSettings = new Gio.Settings({ schema: 'org.gnome.shell.recorder' });
 
@@ -125,6 +131,7 @@ function _initRecorder() {
 }
 
 function _initUserSession() {
+    _initLookingGlass();
     _initRecorder();
 
     global.screen.override_workspace_layout(Meta.ScreenCorner.TOPLEFT, false, -1, 1);
