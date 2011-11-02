@@ -501,13 +501,9 @@ const Inspector = new Lang.Class({
 
         this._borderPaintTarget = null;
         this._borderPaintId = null;
+
         eventHandler.connect('destroy', Lang.bind(this, this._onDestroy));
-        eventHandler.connect('key-press-event', Lang.bind(this, this._onKeyPressEvent));
-        eventHandler.connect('button-press-event', Lang.bind(this, this._onButtonPressEvent));
-        eventHandler.connect('scroll-event', Lang.bind(this, this._onScrollEvent));
-        eventHandler.connect('motion-event', Lang.bind(this, this._onMotionEvent));
-        Clutter.grab_pointer(eventHandler);
-        Clutter.grab_keyboard(eventHandler);
+        this._capturedEventId = global.stage.connect('captured-event', Lang.bind(this, this._onCapturedEvent));
 
         // this._target is the actor currently shown by the inspector.
         // this._pointerTarget is the actor directly under the pointer.
@@ -536,10 +532,9 @@ const Inspector = new Lang.Class({
     },
 
     _close: function() {
-        Clutter.ungrab_pointer(this._eventHandler);
-        Clutter.ungrab_keyboard(this._eventHandler);
         this._eventHandler.destroy();
         this._eventHandler = null;
+        global.stage.disconnect(this._capturedEventId);
         this.emit('closed');
     },
 
@@ -600,6 +595,21 @@ const Inspector = new Lang.Class({
     _onMotionEvent: function (actor, event) {
         this._update(event);
         return true;
+    },
+
+    _onCapturedEvent: function(actor, event) {
+        switch (event.type()) {
+        case Clutter.EventType.KEY_PRESS:
+            return this._onKeyPressEvent(actor, event);
+        case Clutter.EventType.BUTTON_PRESS:
+            return this._onButtonPressEvent(actor, event);
+        case Clutter.EventType.SCROLL:
+            return this._onScrollEvent(actor, event);
+        case Clutter.EventType.MOTION:
+            return this._onMotionEvent(actor, event);
+        }
+
+        return false;
     },
 
     _update: function(event) {
