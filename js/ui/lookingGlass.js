@@ -550,6 +550,9 @@ const Inspector = new Lang.Class({
     },
 
     _onButtonPressEvent: function (actor, event) {
+        if (event.get_button() != 1)
+            return false;
+
         if (this._target) {
             let [stageX, stageY] = event.get_coords();
             this.emit('target', this._target, stageX, stageY);
