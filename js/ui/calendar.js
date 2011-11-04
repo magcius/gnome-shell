@@ -95,15 +95,6 @@ function _getCalendarWeekForDate(date) {
     return weekNumber;
 }
 
-function _getDigitWidth(actor){
-    let context = actor.get_pango_context();
-    let themeNode = actor.get_theme_node();
-    let font = themeNode.get_font();
-    let metrics = context.get_metrics(font, context.get_language());
-    let width = metrics.get_approximate_digit_width();
-    return width;
-}
-
 function _getCalendarDayAbbreviation(dayNumber) {
     let abbreviations = [
         /* Translators: Calendar grid abbreviation for Sunday.
@@ -366,8 +357,6 @@ Calendar.prototype = {
         }
 
         this._weekStart = Shell.util_get_week_start();
-        this._weekdate = NaN;
-        this._digitWidth = NaN;
         this._settings = new Gio.Settings({ schema: 'org.gnome.shell.calendar' });
 
         this._settings.connect('changed::' + SHOW_WEEKDATE_KEY, Lang.bind(this, this._onSettingsChange));
@@ -458,18 +447,6 @@ Calendar.prototype = {
 
         // All the children after this are days, and get removed when we update the calendar
         this._firstDayIndex = this.actor.get_children().length;
-    },
-
-    _onStyleChange: function(actor, event) {
-        // width of a digit in pango units
-        this._digitWidth = _getDigitWidth(this.actor) / Pango.SCALE;
-        this._setWeekdateHeaderWidth();
-    },
-
-    _setWeekdateHeaderWidth: function() {
-        if (this.digitWidth != NaN && this._useWeekdate && this._weekdateHeader) {
-            this._weekdateHeader.set_width (this._digitWidth * WEEKDATE_HEADER_WIDTH_DIGITS);
-        }
     },
 
     _onScroll : function(actor, event) {
