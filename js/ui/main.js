@@ -13,6 +13,7 @@ const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 const Meta = imports.gi.Meta;
+const Mx = imports.gi.Mx;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
 
@@ -451,6 +452,9 @@ function loadTheme() {
         cssStylesheet = _cssStylesheet;
 
     let theme = new St.Theme ({ application_stylesheet: cssStylesheet });
+    let mxTheme = new Mx.StTheme({ application_stylesheet: cssStylesheet });
+
+    Mx.StThemeContext.get_for_stage (global.stage).set_theme (mxTheme);
 
     if (global.session_type == Shell.SessionType.GDM)
         theme.load_stylesheet(_gdmCssStylesheet);

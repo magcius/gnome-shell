@@ -3,7 +3,8 @@
 const Clutter = imports.gi.Clutter;
 const Gio = imports.gi.Gio;
 const Lang = imports.lang;
-const St = imports.gi.St;
+const Mx = imports.gi.Mx;
+const St = imports.gi.Mx;
 const Signals = imports.signals;
 const Pango = imports.gi.Pango;
 const Gettext_gtk30 = imports.gettext.domain('gtk30');
@@ -16,6 +17,10 @@ const SHOW_WEEKDATE_KEY = 'show-weekdate';
 
 // in org.gnome.desktop.interface
 const CLOCK_FORMAT_KEY        = 'clock-format';
+
+function removeAll(actor) {
+    actor.foreach(Lang.bind(this, function(a) { actor.remove_actor(a); }));
+}
 
 function _sameDay(dateA, dateB) {
     return (dateA.getDate() == dateB.getDate() &&
@@ -371,8 +376,7 @@ const Calendar = new Lang.Class({
         // Start off with the current date
         this._selectedDate = new Date();
 
-        this.actor = new St.Table({ homogeneous: false,
-                                    style_class: 'calendar',
+        this.actor = new St.Table({ style_class: 'calendar',
                                     reactive: true });
 
         this.actor.connect('scroll-event',
@@ -395,14 +399,12 @@ const Calendar = new Lang.Class({
 
     _buildHeader: function() {
         let offsetCols = this._useWeekdate ? 1 : 0;
-        this.actor.destroy_children();
+        removeAll(this.actor);
 
         // Top line of the calendar '<| September 2009 |>'
         this._topBox = new St.BoxLayout();
         this.actor.add(this._topBox,
-                       { row: 0, col: 0, col_span: offsetCols + 7 });
-
-        this.actor.connect('style-changed', Lang.bind(this, this._onStyleChange));
+                       { row: 0, column: 0, column_span: offsetCols + 7 });
 
         let back = new St.Button({ style_class: 'calendar-change-month-back' });
         this._topBox.add(back);
@@ -428,10 +430,11 @@ const Calendar = new Lang.Class({
             // and we want, ideally, a single character for e.g. S M T W T F S
             let customDayAbbrev = _getCalendarDayAbbreviation(iter.getDay());
             let label = new St.Label({ style_class: 'calendar-day-base calendar-day-heading',
+                                       x_align: St.Align.MIDDLE,
                                        text: customDayAbbrev });
             this.actor.add(label,
                            { row: 1,
-                             col: offsetCols + (7 + iter.getDay() - this._weekStart) % 7,
+                             column: offsetCols + (7 + iter.getDay() - this._weekStart) % 7,
                              x_fill: false, x_align: St.Align.MIDDLE });
             iter.setTime(iter.getTime() + MSECS_IN_DAY);
         }
@@ -557,7 +560,7 @@ const Calendar = new Lang.Class({
                 styleClass += ' calendar-other-month-day';
 
             if (_sameDay(this._selectedDate, iter))
-                button.add_style_pseudo_class('active');
+                button.style_pseudo_class_add('active');
 
             if (hasEvents)
                 styleClass += ' calendar-day-with-events'
@@ -566,7 +569,7 @@ const Calendar = new Lang.Class({
 
             let offsetCols = this._useWeekdate ? 1 : 0;
             this.actor.add(button,
-                           { row: row, col: offsetCols + (7 + iter.getDay() - this._weekStart) % 7 });
+                           { row: row, column: offsetCols + (7 + iter.getDay() - this._weekStart) % 7 });
 
             if (this._useWeekdate && iter.getDay() == 4) {
                 let label = new St.Label({ text: _getCalendarWeekForDate(iter).toString(),
@@ -596,7 +599,8 @@ const EventsList = new Lang.Class({
     Name: 'EventsList',
 
     _init: function(eventSource) {
-        this.actor = new St.BoxLayout({ vertical: true, style_class: 'events-header-vbox'});
+        this.actor = new St.BoxLayout({ orientation: Mx.Orientation.VERTICAL,
+                                        style_class: 'events-header-vbox'});
         this._date = new Date();
         this._eventSource = eventSource;
         this._eventSource.connect('changed', Lang.bind(this, this._update));
@@ -631,14 +635,17 @@ const EventsList = new Lang.Class({
         if (events.length == 0 && !showNothingScheduled)
             return;
 
-        let vbox = new St.BoxLayout( {vertical: true} );
+        let vbox = new St.BoxLayout({ orientation: Mx.Orientation.VERTICAL });
         this.actor.add(vbox);
 
         vbox.add(new St.Label({ style_class: 'events-day-header', text: header }));
-        let box = new St.BoxLayout({style_class: 'events-header-hbox'});
-        let dayNameBox = new St.BoxLayout({ vertical: true, style_class: 'events-day-name-box' });
-        let timeBox = new St.BoxLayout({ vertical: true, style_class: 'events-time-box' });
-        let eventTitleBox = new St.BoxLayout({ vertical: true, style_class: 'events-event-box' });
+        let box = new St.BoxLayout({ style_class: 'events-header-hbox' });
+        let dayNameBox = new St.BoxLayout({ orientation: Mx.Orientation.VERTICAL,
+                                            style_class: 'events-day-name-box' });
+        let timeBox = new St.BoxLayout({ orientation: Mx.Orientation.VERTICAL,
+                                         style_class: 'events-time-box' });
+        let eventTitleBox = new St.BoxLayout({ orientation: Mx.Orientation.VERTICAL,
+                                               style_class: 'events-event-box' });
         box.add(dayNameBox, {x_fill: false});
         box.add(timeBox, {x_fill: false});
         box.add(eventTitleBox, {expand: true});
@@ -662,7 +669,7 @@ const EventsList = new Lang.Class({
     },
 
     _showOtherDay: function(day) {
-        this.actor.destroy_children();
+        removeAll(this.actor);
 
         let dayBegin = _getBeginningOfDay(day);
         let dayEnd = _getEndOfDay(day);
@@ -679,7 +686,7 @@ const EventsList = new Lang.Class({
     },
 
     _showToday: function() {
-        this.actor.destroy_children();
+        removeAll(this.actor);
 
         let now = new Date();
         let dayBegin = _getBeginningOfDay(now);

@@ -12,6 +12,7 @@ const GLib = imports.gi.GLib;
 const Gtk = imports.gi.Gtk;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
+const Mx = imports.gi.Mx;
 
 // We can't import shell JS modules yet, because they may have
 // variable initializations, etc, that depend on init() already having
@@ -61,6 +62,9 @@ function init() {
     }
 
     // Miscellaneous monkeypatching
+    _patchContainerClass(Mx.BoxLayout, false);
+    _patchContainerClass(Mx.Table, false);
+
     _patchContainerClass(St.BoxLayout, false);
     _patchContainerClass(St.Table, false);
     _patchContainerClass(St.LayoutContainer, true);
