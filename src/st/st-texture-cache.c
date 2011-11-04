@@ -968,16 +968,14 @@ st_texture_cache_load (StTextureCache       *cache,
   CoglHandle texture;
 
   texture = g_hash_table_lookup (cache->priv->keyed_cache, key);
-  if (!texture)
+  if (texture == COGL_INVALID_HANDLE)
     {
       texture = load (cache, key, data, error);
-      if (texture)
+      if (texture && policy == ST_TEXTURE_CACHE_POLICY_FOREVER)
         g_hash_table_insert (cache->priv->keyed_cache, g_strdup (key), texture);
-      else
-        return COGL_INVALID_HANDLE;
     }
-  cogl_handle_ref (texture);
-  return texture;
+
+  return cogl_handle_ref (texture);
 }
 
 /**
