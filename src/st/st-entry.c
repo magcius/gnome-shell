@@ -451,6 +451,25 @@ st_entry_allocate (ClutterActor          *actor,
 }
 
 static void
+st_entry_clipboard_callback (StClipboard *clipboard,
+                             const gchar *text,
+                             gpointer     data)
+{
+  ClutterText *ctext = (ClutterText*)((StEntry *) data)->priv->entry;
+  gint cursor_pos;
+
+  if (!text)
+    return;
+
+  /* delete the current selection before pasting */
+  clutter_text_delete_selection (ctext);
+
+  /* "paste" the clipboard text into the entry */
+  cursor_pos = clutter_text_get_cursor_position (ctext);
+  clutter_text_insert_text (ctext, text, cursor_pos);
+}
+
+static void
 clutter_text_focus_in_cb (ClutterText  *text,
                           ClutterActor *actor)
 {
@@ -510,6 +529,33 @@ clutter_text_password_char_cb (GObject    *object,
 
   if (clutter_text_get_password_char (CLUTTER_TEXT (entry->priv->entry)) == 0)
     remove_capslock_feedback (entry);
+}
+
+static void
+clutter_text_button_press_event (ClutterActor       *actor,
+                                 ClutterButtonEvent *event,
+                                 gpointer            user_data)
+{
+  StClipboard *clipboard;
+
+  /* No need for any of our dirty shenanigans if
+   * we don't have a middle click. */
+  if (event->button != 2)
+    return;
+
+  g_signal_stop_emission_by_name (actor, "button-press-event");
+
+  CLUTTER_ACTOR_CLASS (ST_IM_TEXT_GET_CLASS (actor))->button_press_event (actor, event);
+
+  /* OK, at this point, clutter_text_button_press has run,
+   * meaning that the cursor position is where we want it */
+
+  clipboard = st_clipboard_get_default ();
+
+  st_clipboard_get_text (clipboard,
+                         ST_CLIPBOARD_TYPE_PRIMARY,
+                         st_entry_clipboard_callback,
+                         user_data);
 }
 
 static void
@@ -577,25 +623,6 @@ st_entry_unmap (ClutterActor *actor)
 
   if (priv->secondary_icon)
     clutter_actor_unmap (priv->secondary_icon);
-}
-
-static void
-st_entry_clipboard_callback (StClipboard *clipboard,
-                             const gchar *text,
-                             gpointer     data)
-{
-  ClutterText *ctext = (ClutterText*)((StEntry *) data)->priv->entry;
-  gint cursor_pos;
-
-  if (!text)
-    return;
-
-  /* delete the current selection before pasting */
-  clutter_text_delete_selection (ctext);
-
-  /* "paste" the clipboard text into the entry */
-  cursor_pos = clutter_text_get_cursor_position (ctext);
-  clutter_text_insert_text (ctext, text, cursor_pos);
 }
 
 static gboolean
@@ -779,6 +806,9 @@ st_entry_init (StEntry *entry)
 
   g_signal_connect (priv->entry, "notify::password-char",
                     G_CALLBACK (clutter_text_password_char_cb), entry);
+
+  g_signal_connect (priv->entry, "button-press-event",
+                    G_CALLBACK (clutter_text_button_press_event), entry);
 
   priv->spacing = 6.0f;
 
