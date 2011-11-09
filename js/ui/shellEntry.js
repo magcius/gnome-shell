@@ -65,7 +65,7 @@ const _EntryMenu = new Lang.Class({
     },
 
     _updatePasteItem: function() {
-        this._clipboard.get_text(Lang.bind(this,
+        this._clipboard.get_text(St.ClipboardType.CLIPBOARD, Lang.bind(this,
             function(clipboard, text) {
                 this._pasteItem.setSensitive(text && text != '');
             }));
@@ -85,7 +85,7 @@ const _EntryMenu = new Lang.Class({
     },
 
     _onPasteActivated: function() {
-        this._clipboard.get_text(Lang.bind(this,
+        this._clipboard.get_text(St.ClipboardType.CLIPBOARD, Lang.bind(this,
             function(clipboard, text) {
                 if (!text)
                     return;
