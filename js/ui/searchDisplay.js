@@ -34,6 +34,7 @@ SearchResult.prototype = {
         if (content == null) {
             content = new St.Bin({ style_class: 'search-result-content',
                                    reactive: true,
+                                   can_focus: true,
                                    track_hover: true });
             let icon = new IconGrid.BaseIcon(this.metaInfo['name'],
                                              { createIcon: this.metaInfo['createIcon'] });
@@ -259,6 +260,7 @@ SearchResults.prototype = {
     _createOpenSearchProviderButton: function(provider) {
         let button = new St.Button({ style_class: 'dash-search-button',
                                      reactive: true,
+                                     can_focus: true,
                                      x_fill: true,
                                      y_align: St.Align.MIDDLE });
         let bin = new St.Bin({ x_fill: false,

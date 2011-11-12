@@ -259,7 +259,7 @@ StTooltip StLabel {
     background-gradient-end: rgba(255, 255, 255, 0.1);
 }
 
-.dash-search-button:selected, .notification-button:focus,
+.dash-search-button:focus, .dash-search-button:selected, .notification-button:focus,
 .notification-icon-button:focus, .hotplug-notification-item:focus,
 .modal-dialog-button:focus {
     border: 2px solid #8b8b8b;
@@ -635,7 +635,7 @@ StTooltip StLabel {
     font-weight: bold;
 }
 
-.dash-search-button:selected {
+.dash-search-button:focus, .dash-search-button:selected {
     padding-top: 3px;
     padding-bottom: 4px;
     width: 298px;
