@@ -151,6 +151,17 @@ const SearchTab = new Lang.Class({
         global.stage.connect('notify::key-focus', Lang.bind(this, this._updateCursorVisibility));
 
         this._capturedEventId = 0;
+
+        // Since the entry isn't inside the results container we install this
+        // dummy widget as the last results container child so that we can
+        // include the entry in the keyboard navigation path.
+        this._focusTrap = new St.Bin({ can_focus: true });
+        this._focusTrap.connect('key-focus-in', Lang.bind(this, function() {
+            this._entry.grab_key_focus();
+        }));
+        this._searchResults.actor.add_actor(this._focusTrap);
+
+        global.focus_manager.add_group(this._searchResults.actor);
     },
 
     hide: function() {
@@ -271,8 +282,17 @@ const SearchTab = new Lang.Class({
                 this._reset();
                 return true;
             }
+        } else if (this.active) {
+            if (symbol == Clutter.Tab) {
+                this._searchResults.actor.navigate_focus(null, Gtk.DirectionType.TAB_FORWARD, false);
+                return true;
+            } else if (symbol == Clutter.ISO_Left_Tab) {
+                this._focusTrap.can_focus = false;
+                this._searchResults.actor.navigate_focus(null, Gtk.DirectionType.TAB_BACKWARD, false);
+                this._focusTrap.can_focus = true;
+                return true;
+            }
         }
-
         return false;
     },
 
@@ -527,7 +547,17 @@ const ViewSelector = new Lang.Class({
                     this._nextTab();
                 return true;
             }
-        } else if (Clutter.keysym_to_unicode(symbol)) {
+        } else if (symbol == Clutter.Tab) {
+            if (!this._searchTab.active) {
+                this._activeTab.page.navigate_focus(null, Gtk.DirectionType.TAB_FORWARD, false);
+                return true;
+            }
+        } else if (symbol == Clutter.ISO_Left_Tab) {
+            if (!this._searchTab.active) {
+                this._activeTab.page.navigate_focus(null, Gtk.DirectionType.TAB_BACKWARD, false);
+                return true;
+            }
+        } else if (Clutter.keysym_to_unicode(symbol) || symbol == Clutter.BackSpace) {
             this._searchTab.startSearch(event);
         }
         return false;
