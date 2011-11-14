@@ -63,6 +63,13 @@ const SearchResult = new Lang.Class({
                           }));
     },
 
+    setSelectedStyle: function(selected) {
+        if (selected)
+            this._content.add_style_pseudo_class('selected');
+        else
+            this._content.remove_style_pseudo_class('selected');
+    },
+
     setSelected: function(selected) {
         if (selected)
             this._content.add_style_pseudo_class('selected');
@@ -175,6 +182,22 @@ const GridSearchResults = new Lang.Class({
             return;
         let targetActor = this._grid.getItemAtIndex(this.selectionIndex);
         targetActor._delegate.activate();
+    },
+
+    getResult: function(index) {
+        let nVisible = this.getVisibleResultCount();
+        if (index < 0 || index >= nVisible)
+            return null;
+        return this._grid.getItemAtIndex(index)._delegate;
+    },
+
+    activateResult: function(index) {
+        let result = this.getResult(index);
+        if (!result)
+            return false;
+
+        result.activate();
+        return true;
     }
 });
 
@@ -230,6 +253,9 @@ const SearchResults = new Lang.Class({
         this._openSearchProviders = [];
         this._openSearchSystem.connect('changed', Lang.bind(this, this._updateOpenSearchProviderButtons));
         this._updateOpenSearchProviderButtons();
+
+        this._highlightDefault = false;
+        this._defaultResult = null;
     },
 
     _updateOpenSearchProviderButtons: function() {
@@ -366,13 +392,12 @@ const SearchResults = new Lang.Class({
         let terms = searchSystem.getTerms();
         this._openSearchSystem.setSearchTerms(terms);
 
-        // To avoid CSS transitions causing flickering
-        // of the selection when the first search result
-        // stays the same, we hide the content while
-        // filling in the results and setting the initial
-        // selection.
+        // To avoid CSS transitions causing flickering when the first search
+        // result stays the same, we hide the content while filling in the
+        // results.
         this._content.hide();
 
+        this._defaultResult = null;
         for (let i = 0; i < results.length; i++) {
             let [provider, providerResults] = results[i];
             if (providerResults.length == 0) {
@@ -383,11 +408,14 @@ const SearchResults = new Lang.Class({
                 let meta = this._metaForProvider(provider);
                 meta.actor.show();
                 meta.resultDisplay.renderResults(providerResults, terms);
+
+                if (!this._defaultResult) {
+                    this._defaultResult = meta.resultDisplay.getResult(0);
+                    if (this._defaultResult)
+                        this._defaultResult.setSelectedStyle(this._highlightDefault);
+                }
             }
         }
-
-        if (this._selectedOpenSearchButton == -1)
-            this.selectDown(false);
 
         this._content.show();
 
@@ -480,5 +508,23 @@ const SearchResults = new Lang.Class({
         let resultDisplay = meta.resultDisplay;
         resultDisplay.activateSelected();
         Main.overview.hide();
+    },
+
+    activateDefault: function() {
+        for (let i = 0; i < this._providerMeta.length; i++) {
+            let meta = this._providerMeta[i];
+
+            if (!meta.actor.visible)
+                continue;
+
+            meta.resultDisplay.activateResult(0);
+            break;
+        }
+    },
+
+    highlightDefault: function(highlight) {
+        this._highlightDefault = highlight;
+        if (this._defaultResult)
+            this._defaultResult.setSelectedStyle(highlight);
     }
 });
