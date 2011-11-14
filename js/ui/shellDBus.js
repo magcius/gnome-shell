@@ -156,6 +156,9 @@ const GnomeShell = new Lang.Class({
     ListExtensions: function() {
         let out = {};
         for (let uuid in ExtensionSystem.extensionMeta) {
+            let meta = ExtensionSystem.extensionMeta[uuid];
+            if (meta.type == ExtensionSystem.ExtensionType.SYSTEM)
+                continue;
             let dbusObj = this.GetExtensionInfo(uuid);
             out[uuid] = dbusObj;
         }
@@ -165,6 +168,8 @@ const GnomeShell = new Lang.Class({
     GetExtensionInfo: function(uuid) {
         let meta = ExtensionSystem.extensionMeta[uuid] || {};
         let out = {};
+        if (meta.type == ExtensionSystem.ExtensionType.SYSTEM)
+            return {};
         for (let key in meta) {
             let val = meta[key];
             let type;
@@ -184,6 +189,10 @@ const GnomeShell = new Lang.Class({
     },
 
     GetExtensionErrors: function(uuid) {
+        let meta = ExtensionSystem.extensionMeta[uuid] || {};
+        if (meta.type == ExtensionSystem.ExtensionType.SYSTEM)
+            return [];
+
         return ExtensionSystem.errors[uuid] || [];
     },
 

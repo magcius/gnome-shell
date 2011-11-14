@@ -214,6 +214,9 @@ function disableExtension(uuid) {
     if (meta.state != ExtensionState.ENABLED)
         return;
 
+    if (meta.type == ExtensionType.SYSTEM)
+        return;
+
     let extensionState = extensionStateObjs[uuid];
 
     // "Rebase" the extension order by disabling and then enabling extensions
@@ -517,7 +520,13 @@ function _loadExtensionsIn(dir, type) {
             continue;
         let name = info.get_name();
         let child = dir.get_child(name);
-        let enabled = enabledExtensions.indexOf(name) != -1;
+
+        let enabled;
+        if (type == ExtensionType.SYSTEM)
+            enabled = true; // Always enable system extensions
+        else
+            enabled = enabledExtensions.indexOf(name) != -1;
+
         loadExtension(child, type, enabled);
     }
     fileEnum.close(null);
