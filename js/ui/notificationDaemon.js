@@ -153,13 +153,13 @@ const NotificationDaemon = new Lang.Class({
     },
 
     // Returns the source associated with ndata.notification if it is set.
-    // Otherwise, returns the source associated with the pid if one is
+    // Otherwise, returns the source associated with the appName if one is
     // stored in this._sources and the notification is not transient.
     // Otherwise, creates a new source as long as pid is provided.
     //
-    // Either a pid or ndata.notification is needed to retrieve or
+    // Either an appName or ndata.notification is needed to retrieve or
     // create a source.
-    _getSource: function(title, pid, ndata, sender) {
+    _getSource: function(appName, pid, ndata, sender) {
         if (!pid && !(ndata && ndata.notification))
             return null;
 
@@ -176,20 +176,20 @@ const NotificationDaemon = new Lang.Class({
         // with a transient one from the same sender, so we
         // always create a new source object for new transient notifications
         // and never add it to this._sources .
-        if (!isForTransientNotification && this._sources[pid]) {
-            let source = this._sources[pid];
-            source.setTitle(title);
+        if (!isForTransientNotification && this._sources[appName]) {
+            let source = this._sources[appName];
+            source.setTitle(appName);
             return source;
         }
 
-        let source = new Source(title, pid, sender);
+        let source = new Source(appName, pid, sender);
         source.setTransient(isForTransientNotification);
 
         if (!isForTransientNotification) {
-            this._sources[pid] = source;
+            this._sources[appName] = source;
             source.connect('destroy', Lang.bind(this,
                 function() {
-                    delete this._sources[pid];
+                    delete this._sources[appName];
                 }));
         }
 
@@ -466,7 +466,7 @@ const NotificationDaemon = new Lang.Class({
     },
 
     _onTrayIconRemoved: function(o, icon) {
-        let source = this._sources[icon.pid];
+        let source = this._sources[icon.title];
         if (source)
             source.destroy();
     }
