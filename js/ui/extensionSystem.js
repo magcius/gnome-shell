@@ -297,6 +297,27 @@ function logExtensionError(uuid, message, state) {
                                                state: state });
 }
 
+function _compileSchema(dir) {
+    let argv = ['glib-compile-schemas', '--targetdir', dir.get_path(), dir.get_path()];
+    GLib.spawn_sync(null, argv, null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+}
+
+function _makeGetSettings(meta) {
+    function getSettingsSchema(schemaId) {
+        let schema = meta.schemaSource.lookup(schemaId, true);
+        if (!schema) {
+            throw new Error('Settings schema \'%s\' cannot be found'.format(schemaId));
+        }
+        return schema;
+    }
+
+    function getSettings(schemaId) {
+        return new Gio.Settings({ settings_schema: getSettingsSchema(schemaId) });
+    }
+
+    return [getSettingsSchema, getSettings];
+}
+
 function loadExtension(dir, type, enabled) {
     let info;
     let uuid = dir.get_basename();
@@ -387,6 +408,17 @@ function loadExtension(dir, type, enabled) {
 
     let extensionModule;
     let extensionState = null;
+
+    if (!dir.get_child('gschemas.compiled').query_exists(null))
+        _compileSchema(dir);
+
+    if (dir.get_child('gschemas.compiled').query_exists(null)) {
+        meta.schemaSource = Gio.SettingsSchemaSource.new_from_directory(dir.get_path(),
+                                                                        Gio.SettingsSchemaSource.get_default(),
+                                                                        false, null);
+        [meta.getSettingsSchema, meta.getSettings] = _makeGetSettings(meta);
+    }
+
     try {
         global.add_extension_importer('imports.ui.extensionSystem.extensions', meta.uuid, dir.get_path());
         extensionModule = extensions[meta.uuid].extension;
