@@ -1,5 +1,10 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
+// Import the environment first so that the versions get
+// set before and things are monkey patched before we import
+// any of them.
+const Environment = imports.ui.environment;
+
 const Clutter = imports.gi.Clutter;
 const Gdk = imports.gi.Gdk;
 const Gio = imports.gi.Gio;
@@ -15,7 +20,6 @@ const AutorunManager = imports.ui.autorunManager;
 const CtrlAltTab = imports.ui.ctrlAltTab;
 const EndSessionDialog = imports.ui.endSessionDialog;
 const PolkitAuthenticationAgent = imports.ui.polkitAuthenticationAgent;
-const Environment = imports.ui.environment;
 const ExtensionSystem = imports.ui.extensionSystem;
 const Keyboard = imports.ui.keyboard;
 const MessageTray = imports.ui.messageTray;
