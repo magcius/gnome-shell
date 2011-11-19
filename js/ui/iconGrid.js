@@ -303,7 +303,7 @@ IconGrid.prototype = {
     _onStyleChanged: function() {
         let themeNode = this.actor.get_theme_node();
         this._spacing = themeNode.get_length('spacing');
-        this._item_size = themeNode.get_length('-shell-grid-item-size');
+        this._item_size = themeNode.get_length('-shell-grid-item-size') || ICON_SIZE;
         this._grid.queue_relayout();
     },
 
