@@ -21,29 +21,26 @@ const DASH_ANIMATION_TIME = 0.2;
 // when requesting a size
 const DashItemContainer = new Lang.Class({
     Name: 'DashItemContainer',
+    Extends: St.Container,
 
     _init: function() {
-        this.actor = new Shell.GenericContainer({ style_class: 'dash-item-container' });
-        this.actor.connect('get-preferred-width',
-                           Lang.bind(this, this._getPreferredWidth));
-        this.actor.connect('get-preferred-height',
-                           Lang.bind(this, this._getPreferredHeight));
-        this.actor.connect('allocate',
-                           Lang.bind(this, this._allocate));
-        this.actor._delegate = this;
-
+        this.parent({ style_class: 'dash-item-container' });
         this.child = null;
         this._childScale = 1;
         this._childOpacity = 255;
         this.animatingOut = false;
     },
 
-    _allocate: function(actor, box, flags) {
+    do_allocate: function(actor, box, flags) {
+        this.parent(box, flags);
+
         if (this.child == null)
             return;
 
-        let availWidth = box.x2 - box.x1;
-        let availHeight = box.y2 - box.y1;
+        let contentBox = this.get_theme_node().get_content_box(box);
+
+        let availWidth = contentBox.x2 - contentBox.x1;
+        let availHeight = contentBox.y2 - contentBox.y1;
         let [minChildWidth, minChildHeight, natChildWidth, natChildHeight] =
             this.child.get_preferred_size();
         let [childScaleX, childScaleY] = this.child.get_scale();
@@ -60,38 +57,36 @@ const DashItemContainer = new Lang.Class({
         this.child.allocate(childBox, flags);
     },
 
-    _getPreferredHeight: function(actor, forWidth, alloc) {
-        alloc.min_size = 0;
-        alloc.natural_size = 0;
-
+    do_get_preferred_height: function(actor, forWidth) {
         if (this.child == null)
-            return;
+            return [0, 0];
 
         let [minHeight, natHeight] = this.child.get_preferred_height(forWidth);
-        alloc.min_size += minHeight * this.child.scale_y;
-        alloc.natural_size += natHeight * this.child.scale_y;
+        return [minHeight * this.child.scale_y,
+                natHeight * this.child.scale_y];
     },
 
-    _getPreferredWidth: function(actor, forHeight, alloc) {
-        alloc.min_size = 0;
-        alloc.natural_size = 0;
-
+    do_get_preferred_width: function(actor, forHeight) {
         if (this.child == null)
-            return;
+            return [0, 0];
 
         let [minWidth, natWidth] = this.child.get_preferred_width(forHeight);
-        alloc.min_size = minWidth * this.child.scale_y;
-        alloc.natural_size = natWidth * this.child.scale_y;
+        return [minWidth * this.child.scale_y,
+                natWidth * this.child.scale_y];
     },
+
+    do_paint: St.Container.real_paint,
+    do_pick: St.Container.real_pick,
+    do_get_paint_volume: St.Container.real_get_paint_volume,
 
     setChild: function(actor) {
         if (this.child == actor)
             return;
 
-        this.actor.destroy_children();
+        this.destroy_children();
 
         this.child = actor;
-        this.actor.add_actor(this.child);
+        this.add_actor(this.child);
     },
 
     animateIn: function() {
@@ -110,7 +105,7 @@ const DashItemContainer = new Lang.Class({
 
     animateOutAndDestroy: function() {
         if (this.child == null) {
-            this.actor.destroy();
+            this.destroy();
             return;
         }
 
@@ -122,7 +117,7 @@ const DashItemContainer = new Lang.Class({
                            time: DASH_ANIMATION_TIME,
                            transition: 'easeOutQuad',
                            onComplete: Lang.bind(this, function() {
-                               this.actor.destroy();
+                               this.destroy();
                            })
                          });
     },
@@ -135,7 +130,7 @@ const DashItemContainer = new Lang.Class({
 
         this.child.set_scale_with_gravity(scale, scale,
                                           Clutter.Gravity.CENTER);
-        this.actor.queue_relayout();
+        this.queue_relayout();
     },
 
     get childScale() {
@@ -149,7 +144,7 @@ const DashItemContainer = new Lang.Class({
             return;
 
         this.child.set_opacity(opacity);
-        this.actor.queue_redraw();
+        this.queue_redraw();
     },
 
     get childOpacity() {
@@ -387,10 +382,10 @@ const Dash = new Lang.Class({
         // animating out (which means they will be destroyed at the end of
         // the animation)
         let iconChildren = this._box.get_children().filter(function(actor) {
-            return actor._delegate.child &&
-                   actor._delegate.child._delegate &&
-                   actor._delegate.child._delegate.icon &&
-                   !actor._delegate.animatingOut;
+            return actor.child &&
+                   actor.child._delegate &&
+                   actor.child._delegate.icon &&
+                   !actor.animatingOut;
         });
 
         if (iconChildren.length == 0) {
@@ -413,7 +408,7 @@ const Dash = new Lang.Class({
         let spacing = themeNode.get_length('spacing');
 
 
-        let firstIcon = iconChildren[0]._delegate.child._delegate.icon;
+        let firstIcon = iconChildren[0].child._delegate.icon;
 
         let minHeight, natHeight;
 
@@ -491,13 +486,13 @@ const Dash = new Lang.Class({
         let running = this._appSystem.get_running();
 
         let children = this._box.get_children().filter(function(actor) {
-                return actor._delegate.child &&
-                       actor._delegate.child._delegate &&
-                       actor._delegate.child._delegate.app;
+                return actor.child &&
+                       actor.child._delegate &&
+                       actor.child._delegate.app;
             });
         // Apps currently in the dash
         let oldApps = children.map(function(actor) {
-                return actor._delegate.child._delegate.app;
+                return actor.child._delegate.app;
             });
         // Apps supposed to be in the dash
         let newApps = [];
@@ -563,7 +558,7 @@ const Dash = new Lang.Class({
             let insertHere = newApps[newIndex + 1] &&
                              newApps[newIndex + 1] == oldApps[oldIndex];
             let alreadyRemoved = removedActors.reduce(function(result, actor) {
-                let removedApp = actor._delegate.child._delegate.app;
+                let removedApp = actor.child._delegate.app;
                 return result || removedApp == newApps[newIndex];
             }, false);
 
@@ -579,18 +574,19 @@ const Dash = new Lang.Class({
             }
         }
 
-        for (let i = 0; i < addedItems.length; i++)
-            this._box.insert_actor(addedItems[i].item.actor,
+        for (let i = 0; i < addedItems.length; i++) {
+            this._box.insert_actor(addedItems[i].item,
                                    addedItems[i].pos);
+        }
 
         for (let i = 0; i < removedActors.length; i++) {
-            let item = removedActors[i]._delegate;
+            let item = removedActors[i];
 
             // Don't animate item removal when the overview is hidden
             if (Main.overview.visible)
                 item.animateOutAndDestroy();
             else
-                item.actor.destroy();
+                item.destroy();
         }
 
         this._adjustIconSize();
@@ -651,10 +647,10 @@ const Dash = new Lang.Class({
         if (pos != this._dragPlaceholderPos && pos <= numFavorites) {
             if (this._animatingPlaceholdersCount > 0) {
                 let appChildren = children.filter(function(actor) {
-                    return actor._delegate &&
-                           actor._delegate.child &&
-                           actor._delegate.child._delegate &&
-                           actor._delegate.child._delegate.app;
+                    return actor &&
+                           actor.child &&
+                           actor.child._delegate &&
+                           actor.child._delegate.app;
                 });
                 this._dragPlaceholderPos = children.indexOf(appChildren[pos]);
             } else {
@@ -731,7 +727,7 @@ const Dash = new Lang.Class({
                 children[i] == this._dragPlaceholder.actor)
                 continue;
 
-            let childId = children[i]._delegate.child._delegate.app.get_id();
+            let childId = children[i].child._delegate.app.get_id();
             if (childId == id)
                 continue;
             if (childId in favorites)
