@@ -1,6 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 const Clutter = imports.gi.Clutter;
+const Gtk = imports.gi.Gtk;
 const Gdk = imports.gi.Gdk;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
@@ -577,8 +578,9 @@ function _globalKeyPressHandler(actor, event) {
     if (global.session_type == Shell.SessionType.USER && (!overview.visible || modalCount > 1))
         return false;
 
-    // This isn't a Meta.KeyBindingAction yet
-    if (symbol == Clutter.Super_L || symbol == Clutter.Super_R) {
+    let mutterSettings = new Gio.Settings({ schema: 'org.gnome.mutter' });
+    let [overlayKey, overlayMask] = Gtk.accelerator_parse(mutterSettings.get_string('overlay-key'));
+    if (symbol == overlayKey && modifierState == overlayMask) {
         overview.hide();
         return true;
     }
