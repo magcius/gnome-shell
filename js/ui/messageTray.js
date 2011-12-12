@@ -456,18 +456,9 @@ const Notification = new Lang.Class({
         this._bannerBox.connect('allocate', Lang.bind(this, this._bannerBoxAllocate));
         this._table.add(this._bannerBox, { row: 0,
                                            col: 1,
-                                           col_span: 2,
-                                           x_expand: false,
+                                           x_expand: true,
                                            y_expand: false,
                                            y_fill: false });
-
-        // This is an empty cell that overlaps with this._bannerBox cell to ensure
-        // that this._bannerBox cell expands horizontally, while not forcing the
-        // this._imageBin that is also in col: 2 to expand horizontally.
-        this._table.add(new St.Bin(), { row: 0,
-                                        col: 2,
-                                        y_expand: false,
-                                        y_fill: false });
 
         this._titleLabel = new St.Label();
         this._bannerBox.add_actor(this._titleLabel);
