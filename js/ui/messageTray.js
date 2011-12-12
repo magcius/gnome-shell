@@ -586,7 +586,8 @@ const Notification = new Lang.Class({
                                                vscrollbar_policy: this._scrollPolicy,
                                                hscrollbar_policy: Gtk.PolicyType.NEVER });
         this._table.add(this._scrollArea, { row: 1,
-                                            col: 2 });
+                                            col: 2,
+                                            x_expand: true });
         this._updateLastColumnSettings();
         this._contentArea = new St.BoxLayout({ style_class: 'notification-body',
                                                vertical: true });
@@ -665,6 +666,7 @@ const Notification = new Lang.Class({
             props = {};
         props.row = 2;
         props.col = 2;
+        props.x_expand = true;
 
         this._table.add_style_class_name('multi-line-notification');
         this._table.add(this._actionArea, props);
