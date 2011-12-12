@@ -108,6 +108,23 @@ const NotificationDaemon = new Lang.Class({
             Lang.bind(this, this._onFocusAppChanged));
     },
 
+
+    // Takes a filename, URI or an icon name.
+    _iconFromString: function(icon, size) {
+        let textureCache = St.TextureCache.get_default();
+
+        if (icon.substr(0, 7) == 'file://') {
+            return textureCache.load_uri_async(icon, size, size);
+        } else if (icon[0] == '/') {
+            let uri = GLib.filename_to_uri(icon, null);
+            return textureCache.load_uri_async(uri, size, size);
+        } else {
+            return new St.Icon({ icon_name: icon,
+                                 icon_type: St.IconType.FULLCOLOR,
+                                 icon_size: size });
+        }
+    },
+
     _iconForNotificationData: function(icon, hints, size) {
         let textureCache = St.TextureCache.get_default();
 
@@ -120,21 +137,13 @@ const NotificationDaemon = new Lang.Class({
         // one of 'image-data' or 'image-path' are specified, we show both an icon and
         // a large image.
         if (icon) {
-            if (icon.substr(0, 7) == 'file://')
-                return textureCache.load_uri_async(icon, size, size);
-            else if (icon[0] == '/') {
-                let uri = GLib.filename_to_uri(icon, null);
-                return textureCache.load_uri_async(uri, size, size);
-            } else
-                return new St.Icon({ icon_name: icon,
-                                     icon_type: St.IconType.FULLCOLOR,
-                                     icon_size: size });
+            return this._iconFromString(icon, size);
         } else if (hints['image-data']) {
             let [width, height, rowStride, hasAlpha,
                  bitsPerSample, nChannels, data] = hints['image-data'];
             return textureCache.load_from_raw(data, hasAlpha, width, height, rowStride, size);
         } else if (hints['image-path']) {
-            return textureCache.load_uri_async(GLib.filename_to_uri(hints['image-path'], null), size, size);
+            return this._iconFromString(hints['image-path'], size);
         } else {
             let stockIcon;
             switch (hints.urgency) {
