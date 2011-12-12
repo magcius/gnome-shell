@@ -38,15 +38,15 @@ G_BEGIN_DECLS
 #define ST_IS_TABLE_CHILD_CLASS(klass)     (G_TYPE_CHECK_CLASS_TYPE ((klass), ST_TYPE_TABLE_CHILD))
 #define ST_TABLE_CHILD_GET_CLASS(obj)      (G_TYPE_INSTANCE_GET_CLASS ((obj), ST_TYPE_TABLE_CHILD, StTableChildClass))
 
-typedef struct _StTableChild         StTableChild;
-typedef struct _StTableChildClass    StTableChildClass;
-
 /**
  * StTableChild:
  *
- * The contents of the this structure are private and should only be accessed
- * through the public API.
+ * The contents of this structure is private and should only be accessed using
+ * the provided API.
  */
+typedef struct _StTableChild         StTableChild;
+typedef struct _StTableChildClass    StTableChildClass;
+
 struct _StTableChild
 {
   /*< private >*/
