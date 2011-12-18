@@ -37,6 +37,7 @@ const ExtensionType = {
 const REPOSITORY_URL_BASE = 'https://extensions.gnome.org';
 const REPOSITORY_URL_DOWNLOAD = REPOSITORY_URL_BASE + '/download-extension/%s.shell-extension.zip';
 const REPOSITORY_URL_INFO =     REPOSITORY_URL_BASE + '/extension-info/';
+const REPOSITORY_URL_UPDATE =   REPOSITORY_URL_BASE + '/update-info';
 
 const _httpSession = new Soup.SessionAsync();
 
@@ -84,6 +85,41 @@ const disconnect = Lang.bind(_signals, _signals.disconnect);
 var errors = {};
 
 const ENABLED_EXTENSIONS_KEY = 'enabled-extensions';
+
+// Date that the shell update was last checked
+var lastUpdated = null;
+
+function updateShellExtensions() {
+    let installed = {};
+    for (let uuid in extensionMeta) {
+        let meta = extensionMeta[uuid];
+
+        // Depend on SweetTooth installing the "version"
+        // field in its generated metadata for us.
+        if (!('version' in meta))
+            continue;
+
+        installed[uuid] = version;
+    }
+
+    let message = Soup.form_request_new_from_hash('GET', REPOSITORY_URL_UPDATE, params);
+
+    _httpSession.queue_message(message, function(session, message) {
+        let operations = JSON.parse(message.response_body.data);
+        updateLogic(operations);
+    });
+}
+
+function updateLogic(operations) {
+    for (let uuid in operations) {
+        let operation = operations[uuid].operation;
+
+        if (operation == 'blacklist') {
+            uninstallExtensionFromUUID(uuid);
+        } else if (operation == 'upgrade') {
+        }
+    }
+}
 
 /**
  * versionCheck:
@@ -600,6 +636,7 @@ const InstallExtensionDialog = new Lang.Class({
 
         let url = REPOSITORY_URL_DOWNLOAD.format(this._uuid);
         let message = Soup.form_request_new_from_hash('GET', url, params);
+        log(message.uri.to_string(true));
 
         _httpSession.queue_message(message,
                                    Lang.bind(this, function(session, message) {
