@@ -25,6 +25,7 @@
 #include <girepository.h>
 #include <meta/display.h>
 #include <meta/util.h>
+#include <meta/meta-shaped-texture.h>
 
 /* Memory report bits */
 #ifdef HAVE_MALLINFO
@@ -2144,9 +2145,9 @@ shell_global_screenshot_window (ShellGlobal  *global,
                                 gboolean include_frame,
                                 const char *filename)
 {
-  CoglHandle texture;
   cairo_surface_t *image;
   guchar *data;
+  gfloat x, y;
 
   MetaScreen *screen = meta_plugin_get_screen (global->plugin);
   MetaDisplay *display = meta_screen_get_display (screen);
@@ -2154,33 +2155,29 @@ shell_global_screenshot_window (ShellGlobal  *global,
   ClutterActor *window_actor;
 
   cairo_status_t status;
+  MetaShapedTexture *stex;
+  cairo_rectangle_int_t clip;
+  MetaRectangle rect;
 
   window_actor = CLUTTER_ACTOR (meta_window_get_compositor_private (window));
-  texture = clutter_texture_get_cogl_texture (CLUTTER_TEXTURE (meta_window_actor_get_texture (META_WINDOW_ACTOR (window_actor))));
+  stex = META_SHAPED_TEXTURE (meta_window_actor_get_texture (META_WINDOW_ACTOR (window_actor)));
 
-  if (!include_frame)
-    {
-      MetaRectangle *window_rect = meta_window_get_rect (window);
-      texture = cogl_texture_new_from_sub_texture (texture,
-                                                   window_rect->x,
-                                                   window_rect->y,
-                                                   window_rect->width,
-                                                   window_rect->height);
-
-      image = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
-                                          window_rect->width,
-                                          window_rect->height);
-    }
+  if (include_frame)
+    meta_window_get_outer_rect (window, &rect);
   else
-    image = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
-                                        clutter_actor_get_width (window_actor),
-                                        clutter_actor_get_height (window_actor));
+    rect = *meta_window_get_rect (window);
+
+  clutter_actor_get_position (window_actor, &x, &y);
+
+  clip.x = rect.x - x; clip.y = rect.y - y;
+  clip.width = rect.width; clip.height = rect.height;
+
+  image = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
+                                      clip.width, clip.height);
 
   data = cairo_image_surface_get_data (image);
 
-  cogl_flush();
-
-  cogl_texture_get_data (texture, CLUTTER_CAIRO_FORMAT_ARGB32, 0, data);
+  meta_shaped_texture_as_flattened_data (stex, &clip, data);
 
   cairo_surface_mark_dirty (image);
   status = cairo_surface_write_to_png (image, filename);
