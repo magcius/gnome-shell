@@ -79,7 +79,11 @@ static void
 set_texture_cogl_texture (ClutterTexture *clutter_texture, CoglHandle cogl_texture)
 {
   clutter_texture_set_cogl_texture (clutter_texture, cogl_texture);
-  g_object_set (clutter_texture, "opacity", 255, NULL);
+  g_object_set (clutter_texture,
+                "opacity", 255,
+                "min-width", (float) cogl_texture_get_width (cogl_texture),
+                "min-height", (float) cogl_texture_get_height (cogl_texture),
+                NULL);
 }
 
 static void
