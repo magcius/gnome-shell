@@ -88,12 +88,6 @@ const WorkspacesView = new Lang.Class({
                 for (let w = 0; w < this._extraWorkspaces.length; w++)
                     this._extraWorkspaces[w].zoomToOverview();
         }));
-        this._overviewShownId =
-            Main.overview.connect('shown',
-                                 Lang.bind(this, function() {
-                this.actor.set_clip(this._clipX, this._clipY,
-                                    this._clipWidth, this._clipHeight);
-        }));
 
         this.scrollAdjustment = new St.Adjustment({ value: activeWorkspaceIndex,
                                                     lower: 0,
@@ -332,7 +326,6 @@ const WorkspacesView = new Lang.Class({
         this._destroyExtraWorkspaces();
         this.scrollAdjustment.run_dispose();
         Main.overview.disconnect(this._overviewShowingId);
-        Main.overview.disconnect(this._overviewShownId);
         global.window_manager.disconnect(this._switchWorkspaceNotifyId);
         this._settings.disconnect(this._updateExtraWorkspacesId);
 
@@ -476,7 +469,6 @@ const WorkspacesDisplay = new Lang.Class({
         this.actor.connect('allocate', Lang.bind(this, this._allocate));
         this.actor.connect('notify::mapped', Lang.bind(this, this._setupSwipeScrolling));
         this.actor.connect('parent-set', Lang.bind(this, this._parentSet));
-        this.actor.set_clip_to_allocation(true);
 
         let controls = new St.Bin({ style_class: 'workspace-controls',
                                     request_mode: Clutter.RequestMode.WIDTH_FOR_HEIGHT,
