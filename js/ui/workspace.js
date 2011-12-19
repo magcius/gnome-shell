@@ -31,21 +31,11 @@ const DRAGGING_WINDOW_OPACITY = 100;
 const BUTTON_LAYOUT_SCHEMA = 'org.gnome.shell.overrides';
 const BUTTON_LAYOUT_KEY = 'button-layout';
 
+const MAX_WINDOW_SIZE = 0.70;
+
 // Define a layout scheme for small window counts. For larger
 // counts we fall back to an algorithm. We need more schemes here
 // unless we have a really good algorithm.
-
-// Each triplet is [xCenter, yCenter, scale] where the scale
-// is relative to the width of the workspace.
-const POSITIONS = {
-        1: [[0.5, 0.5, 0.95]],
-        2: [[0.25, 0.5, 0.48], [0.75, 0.5, 0.48]],
-        3: [[0.25, 0.25, 0.48],  [0.75, 0.25, 0.48],  [0.5, 0.75, 0.48]],
-        4: [[0.25, 0.25, 0.47],   [0.75, 0.25, 0.47], [0.75, 0.75, 0.47], [0.25, 0.75, 0.47]],
-        5: [[0.165, 0.25, 0.32], [0.495, 0.25, 0.32], [0.825, 0.25, 0.32], [0.25, 0.75, 0.32], [0.75, 0.75, 0.32]]
-};
-// Used in _orderWindowsPermutations, 5! = 120 which is probably the highest we can go
-const POSITIONING_PERMUTATIONS_MAX = 5;
 
 function _interpolate(start, end, step) {
     return start + (end - start) * step;
@@ -766,225 +756,6 @@ const Workspace = new Lang.Class({
         return this._windows.length == 0;
     },
 
-    // Only use this for n <= 20 say
-    _factorial: function(n) {
-        let result = 1;
-        for (let i = 2; i <= n; i++)
-            result *= i;
-        return result;
-    },
-
-    /**
-     * _permutation:
-     * @permutationIndex: An integer from [0, list.length!)
-     * @list: (inout): Array of objects to permute; will be modified in place
-     *
-     * Given an integer between 0 and length of array, re-order the array in-place
-     * into a permutation denoted by the index.
-     */
-    _permutation: function(permutationIndex, list) {
-        for (let j = 2; j <= list.length; j++) {
-            let firstIndex = (permutationIndex % j);
-            let secondIndex = j - 1;
-            // Swap
-            let tmp = list[firstIndex];
-            list[firstIndex] = list[secondIndex];
-            list[secondIndex] = tmp;
-            permutationIndex = Math.floor(permutationIndex / j);
-        }
-    },
-
-    /**
-     * _forEachPermutations:
-     * @list: Array
-     * @func: Function which takes a single array argument
-     *
-     * Call @func with each permutation of @list as an argument.
-     */
-    _forEachPermutations: function(list, func) {
-        let nCombinations = this._factorial(list.length);
-        for (let i = 0; i < nCombinations; i++) {
-            let listCopy = list.concat();
-            this._permutation(i, listCopy);
-            func(listCopy);
-        }
-    },
-
-    /**
-     * _computeWindowMotion:
-     * @actor: A #WindowClone's #ClutterActor
-     * @slot: An element of #POSITIONS
-     * @slotGeometry: Layout of @slot
-     *
-     * Returns a number corresponding to how much perceived motion
-     * would be involved in moving the window to the given slot.
-     * Currently this is the square of the distance between the
-     * centers.
-     */
-    _computeWindowMotion: function (actor, slot) {
-        let [xCenter, yCenter, fraction] = slot;
-        let xDelta, yDelta, distanceSquared;
-        let actorWidth, actorHeight;
-
-        let x = actor.x;
-        let y = actor.y;
-        let scale = actor.scale_x;
-
-        if (actor._delegate.inDrag) {
-            x = actor._delegate.dragOrigX;
-            y = actor._delegate.dragOrigY;
-            scale = actor._delegate.dragOrigScale;
-        }
-
-        actorWidth = actor.width * scale;
-        actorHeight = actor.height * scale;
-        xDelta = x + actorWidth / 2.0 - xCenter * this._width - this._x;
-        yDelta = y + actorHeight / 2.0 - yCenter * this._height - this._y;
-        distanceSquared = xDelta * xDelta + yDelta * yDelta;
-
-        return distanceSquared;
-    },
-
-    /**
-     * _orderWindowsPermutations:
-     *
-     * Iterate over all permutations of the windows, and determine the
-     * permutation which has the least total motion.
-     */
-    _orderWindowsPermutations: function (clones, slots) {
-        let minimumMotionPermutation = null;
-        let minimumMotion = -1;
-        let permIndex = 0;
-        this._forEachPermutations(clones, Lang.bind(this, function (permutation) {
-            let motion = 0;
-            for (let i = 0; i < permutation.length; i++) {
-                let cloneActor = permutation[i].actor;
-                let slot = slots[i];
-
-                let delta = this._computeWindowMotion(cloneActor, slot);
-
-                motion += delta;
-
-                // Bail out early if we're already larger than the
-                // previous best
-                if (minimumMotionPermutation != null &&
-                    motion > minimumMotion)
-                    continue;
-            }
-
-            if (minimumMotionPermutation == null || motion < minimumMotion) {
-                minimumMotionPermutation = permutation;
-                minimumMotion = motion;
-            }
-            permIndex++;
-        }));
-        return minimumMotionPermutation;
-    },
-
-    /**
-     * _orderWindowsGreedy:
-     *
-     * Iterate over available slots in order, placing into each one the window
-     * we find with the smallest motion to that slot.
-     */
-    _orderWindowsGreedy: function(clones, slots) {
-        let result = [];
-        let slotIndex = 0;
-        // Copy since we mutate below
-        let clonesCopy = clones.concat();
-        for (let i = 0; i < slots.length; i++) {
-            let slot = slots[i];
-            let minimumMotionIndex = -1;
-            let minimumMotion = -1;
-            for (let j = 0; j < clonesCopy.length; j++) {
-                let cloneActor = clonesCopy[j].actor;
-                let delta = this._computeWindowMotion(cloneActor, slot);
-                if (minimumMotionIndex == -1 || delta < minimumMotion) {
-                    minimumMotionIndex = j;
-                    minimumMotion = delta;
-                }
-            }
-            result.push(clonesCopy[minimumMotionIndex]);
-            clonesCopy.splice(minimumMotionIndex, 1);
-        }
-        return result;
-    },
-
-    /**
-     * _orderWindowsByMotionAndStartup:
-     * @windows: Array of #MetaWindow
-     * @slots: Array of slots
-     *
-     * Returns a copy of @windows, ordered in such a way that they require least motion
-     * to move to the final screen coordinates of @slots.  Ties are broken in a stable
-     * fashion by the order in which the windows were created.
-     */
-    _orderWindowsByMotionAndStartup: function(clones, slots) {
-        clones.sort(function(w1, w2) {
-            return w2.metaWindow.get_stable_sequence() - w1.metaWindow.get_stable_sequence();
-        });
-        if (clones.length <= POSITIONING_PERMUTATIONS_MAX)
-            return this._orderWindowsPermutations(clones, slots);
-        else
-            return this._orderWindowsGreedy(clones, slots);
-    },
-
-    /**
-     * _getSlotGeometry:
-     * @slot: A layout slot
-     *
-     * Returns: the screen-relative [x, y, width, height]
-     * of a given window layout slot.
-     */
-    _getSlotGeometry: function(slot) {
-        let [xCenter, yCenter, fraction] = slot;
-
-        let width = this._width * fraction;
-        let height = this._height * fraction;
-
-        let x = this._x + xCenter * this._width - width / 2 ;
-        let y = this._y + yCenter * this._height - height / 2;
-
-        return [x, y, width, height];
-    },
-
-    /**
-     * _computeWindowLayout:
-     * @metaWindow: A #MetaWindow
-     * @slot: A layout slot
-     *
-     * Given a window and slot to fit it in, compute its
-     * screen-relative [x, y, scale] where scale applies
-     * to both X and Y directions.
-     */
-    _computeWindowLayout: function(metaWindow, slot) {
-        let [x, y, width, height] = this._getSlotGeometry(slot);
-
-        let rect = metaWindow.get_outer_rect();
-        let buttonOuterHeight, captionHeight;
-        let buttonOuterWidth = 0;
-
-        if (this._windowOverlays[0]) {
-            [buttonOuterHeight, captionHeight] = this._windowOverlays[0].chromeHeights();
-            buttonOuterWidth = this._windowOverlays[0].chromeWidth();
-        } else
-            [buttonOuterHeight, captionHeight] = [0, 0];
-
-        let scale = Math.min((width - buttonOuterWidth) / rect.width,
-                             (height - buttonOuterHeight - captionHeight) / rect.height,
-                             1.0);
-
-        x = Math.floor(x + (width - scale * rect.width) / 2);
-
-        // We want to center the window in case we have just one
-        if (metaWindow.get_workspace().n_windows == 1)
-            y = Math.floor(y + (height - scale * rect.height) / 2);
-        else
-            y = Math.floor(y + height - rect.height * scale - captionHeight);
-
-        return [x, y, scale];
-    },
-
     setReservedSlot: function(clone) {
         if (this._reservedSlot == clone)
             return;
@@ -999,6 +770,147 @@ const Workspace = new Lang.Class({
         else
             this._reservedSlot = null;
         this.positionWindows(WindowPositionFlags.ANIMATE);
+    },
+
+    _makeRows: function(windows, spacing) {
+        function makeRow() {
+            return { width: 0, height: 0, windows: [] };
+        }
+
+        let rowIndex = 0;
+        let rows = [makeRow()];
+
+        let factor = Math.min(MAX_WINDOW_SIZE, 1. / windows.length);
+
+        // Give us the breathing room of a fully maximized window at the
+        // initial scaling factor.
+        let maxWidth = this._width - this._monitor.width * factor;
+
+        for (let i = 0; i < windows.length; i++) {
+            let window = windows[i];
+            let windowWidth = window.actor.width * factor;
+            let windowHeight = window.actor.height * factor;
+
+            if (rows[rowIndex].width + windowWidth > maxWidth) {
+                rows.push(makeRow());
+                rowIndex++;
+            }
+
+            rows[rowIndex].width += windowWidth;
+            rows[rowIndex].height = Math.max(rows[rowIndex].height, windowHeight);
+            rows[rowIndex].windows.push(window);
+        }
+
+        for (let i = 0; i < rows.length; i++) {
+            rows[i].width += spacing * (rows[i].windows.length - 1);
+        }
+
+        return [rows, factor];
+    },
+
+    _computeRowHeightsExcept : function(rows, spacing, except) {
+        let totalHeight = 0;
+        for (let i = 0; i < rows.length; i++)
+            if (i != except)
+                totalHeight += rows[i].height;
+
+        // compute spacing for the excepted row
+        return totalHeight + spacing * (rows.length - 1);
+    },
+
+    _computeSlots : function(windows) {
+        const SPACING = 60;
+
+        let [rows, factor] = this._makeRows(windows, SPACING);
+
+        let factors = [];
+        for (let i = 0; i < rows.length; i++) {
+            factors.push([]);
+            for (let j = 0; j < windows.length; j++)
+                factors[i].push(factor);
+        }
+
+        for (let i = 0; i < rows.length; i++) {
+            // Distribute the space among all windows in a row
+            let row = rows[i];
+            let nothingWindows = {};
+            let rowWindows = row.windows.slice();
+
+            let leftoverSpace = this._width - row.width;
+            let j = 0;
+
+            function nextWindow() {
+                j = (j + 1) % rowWindows.length;
+            }
+
+            function windowAllDone() {
+                nothingWindows[j] = true;
+                nextWindow();
+            }
+
+            while (leftoverSpace > 0) {
+                let window = rowWindows[j];
+
+                if (Object.keys(nothingWindows).length == rowWindows.length)
+                    break;
+
+                if (j in nothingWindows) {
+                    nextWindow();
+                    continue;
+                }
+
+                if (factors[i][j] >= MAX_WINDOW_SIZE) {
+                    windowAllDone();
+                    continue;
+                }
+
+                let incrementW = window.actor.width * 0.01;
+                if (incrementW + row.width > this._width) {
+                    windowAllDone();
+                    continue;
+                }
+
+                let newH = window.actor.height * (factors[i][j] + 0.01);
+                if (newH > rows[i].height) {
+	            // See if it's OK to stretch the entire row down
+                    let allOtherRowsH = this._computeRowHeightsExcept(rows, SPACING, i);
+                    if (newH > this._height - allOtherRowsH) {
+                        windowAllDone();
+                        continue;
+                    }
+                    rows[i].height = newH;
+                }
+
+                factors[i][j] += 0.01;
+                row.width += incrementW;
+                leftoverSpace -= incrementW;
+                nextWindow();
+            }
+        }
+
+        let slots = [];
+        let y = 0;
+        for (let i = 0; i < rows.length; i++) {
+            let row = rows[i];
+
+            let x = 0;
+            for (let j = 0; j < row.windows.length; j++) {
+                let window = row.windows[j];
+                let centerX = (this._width - row.width) / 2;
+
+                // Align to bottom.
+                let windowY = row.height - window.actor.height * factors[i][j];
+                slots.push([this._x + centerX + x,
+                            this._y + y + windowY,
+                            factors[i][j]]);
+
+                x += window.actor.width * factors[i][j] + SPACING;
+            }
+
+            y += row.height + SPACING;
+        }
+
+        return slots;
     },
 
     /**
@@ -1020,10 +932,11 @@ const Workspace = new Lang.Class({
         let initialPositioning = flags & WindowPositionFlags.INITIAL;
         let animate = flags & WindowPositionFlags.ANIMATE;
 
-        // Start the animations
-        let slots = this._computeAllWindowSlots(clones.length);
-        clones = this._orderWindowsByMotionAndStartup(clones, slots);
+        clones.sort(function(w1, w2) {
+            return w2.metaWindow.get_stable_sequence() - w1.metaWindow.get_stable_sequence();
+        });
 
+        let slots = this._computeSlots(clones);
         let currentWorkspace = global.screen.get_active_workspace();
         let isOnCurrentWorkspace = this.metaWorkspace == null || this.metaWorkspace == currentWorkspace;
 
@@ -1039,7 +952,7 @@ const Workspace = new Lang.Class({
             if (clone.inDrag)
                 continue;
 
-            let [x, y, scale] = this._computeWindowLayout(metaWindow, slot);
+            let [x, y, scale] = slot;
 
             if (overlay && initialPositioning)
                 overlay.hide();
@@ -1460,31 +1373,6 @@ const Workspace = new Lang.Class({
                 continue;
             overlay.hideCloseButton();
         }
-    },
-
-    _computeWindowSlot : function(windowIndex, numberOfWindows) {
-        if (numberOfWindows in POSITIONS)
-            return POSITIONS[numberOfWindows][windowIndex];
-
-        // If we don't have a predefined scheme for this window count,
-        // arrange the windows in a grid pattern.
-        let gridWidth = Math.ceil(Math.sqrt(numberOfWindows));
-        let gridHeight = Math.ceil(numberOfWindows / gridWidth);
-
-        let fraction = 0.95 * (1. / gridWidth);
-
-        let xCenter = (.5 / gridWidth) + ((windowIndex) % gridWidth) / gridWidth;
-        let yCenter = (.5 / gridHeight) + Math.floor((windowIndex / gridWidth)) / gridHeight;
-
-        return [xCenter, yCenter, fraction];
-    },
-
-    _computeAllWindowSlots: function(totalWindows) {
-        let slots = [];
-        for (let i = 0; i < totalWindows; i++) {
-            slots.push(this._computeWindowSlot(i, totalWindows));
-        }
-        return slots;
     },
 
     _onCloneSelected : function (clone, time) {
