@@ -47,10 +47,16 @@ function _patchContainerClass(containerClass, hasLayoutManager) {
     };
 }
 
+let _origLog = window.log;
+function _betterLog() {
+    _origLog(Array.prototype.join.call(arguments, ', '));
+}
+
 function init() {
     // Add some bindings to the global JS namespace; (gjs keeps the web
     // browser convention of having that namespace be called 'window'.)
     window.global = Shell.Global.get();
+    window.log = _betterLog;
 
     window._ = Gettext.gettext;
     window.C_ = Gettext.pgettext;
