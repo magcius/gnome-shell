@@ -426,6 +426,8 @@ st_widget_paint (ClutterActor *actor)
                                     opacity);
   else
     st_theme_node_paint (theme_node, &allocation, opacity);
+
+  CLUTTER_ACTOR_CLASS (st_widget_parent_class)->paint (actor);
 }
 
 static void
@@ -754,18 +756,20 @@ st_widget_hide (ClutterActor *actor)
 }
 
 static gboolean
-st_widget_get_paint_volume (ClutterActor *self, ClutterPaintVolume *volume)
+st_widget_get_paint_volume (ClutterActor *self,
+                            ClutterPaintVolume *volume)
 {
   ClutterActorBox paint_box, alloc_box;
   StThemeNode *theme_node;
   StWidgetPrivate *priv;
   ClutterVertex origin;
+  ClutterActor *iter;
 
   /* Setting the paint volume does not make sense when we don't have any allocation */
   if (!clutter_actor_has_allocation (self))
     return FALSE;
 
-  priv = ST_WIDGET(self)->priv;
+  priv = ST_WIDGET (self)->priv;
 
   theme_node = st_widget_get_theme_node (ST_WIDGET(self));
   clutter_actor_get_allocation_box (self, &alloc_box);
@@ -784,7 +788,38 @@ st_widget_get_paint_volume (ClutterActor *self, ClutterPaintVolume *volume)
   clutter_paint_volume_set_width (volume, paint_box.x2 - paint_box.x1);
   clutter_paint_volume_set_height (volume, paint_box.y2 - paint_box.y1);
 
+  for (iter = clutter_actor_get_first_child (self);
+       iter != NULL;
+       iter = clutter_actor_get_next_sibling (self))
+    {
+      const ClutterPaintVolume *child_volume;
+
+      child_volume = clutter_actor_get_transformed_paint_volume (iter, self);
+      if (child_volume == NULL)
+        return FALSE;
+
+      clutter_paint_volume_union (volume, child_volume);
+    }
+
   return TRUE;
+}
+
+static GList *
+st_widget_real_get_focus_chain (StWidget *widget)
+{
+  ClutterActor *iter;
+  GList *chain;
+
+  chain = NULL;
+  for (iter = clutter_actor_get_first_child (CLUTTER_ACTOR (widget));
+       iter != NULL;
+       iter = clutter_actor_get_next_sibling (iter))
+    {
+      if (CLUTTER_ACTOR_IS_VISIBLE (iter))
+        chain = g_list_append (chain, iter);
+    }
+
+  return chain;
 }
 
 
@@ -824,6 +859,7 @@ st_widget_class_init (StWidgetClass *klass)
   klass->style_changed = st_widget_real_style_changed;
   klass->navigate_focus = st_widget_real_navigate_focus;
   klass->get_accessible_type = st_widget_accessible_get_type;
+  klass->get_focus_chain = st_widget_real_get_focus_chain;
 
   /**
    * StWidget:pseudo-class:
@@ -1420,6 +1456,44 @@ st_widget_name_notify (StWidget   *widget,
 }
 
 static void
+st_widget_first_child_notify (StWidget   *widget,
+                              GParamSpec *pspec,
+                              gpointer    data)
+{
+  ClutterActor *iter;
+  ClutterActor *first_child;
+
+  first_child = clutter_actor_get_first_child (CLUTTER_ACTOR (widget));
+  if (ST_IS_WIDGET (first_child))
+    st_widget_add_style_pseudo_class (ST_WIDGET (first_child), "first-child");
+
+  for (iter = clutter_actor_get_next_sibling (first_child);
+       iter != NULL;
+       iter = clutter_actor_get_next_sibling (iter))
+    if (ST_IS_WIDGET (iter))
+      st_widget_remove_style_pseudo_class (ST_WIDGET (iter), "first-child");
+}
+
+static void
+st_widget_last_child_notify (StWidget   *widget,
+                             GParamSpec *pspec,
+                             gpointer    data)
+{
+  ClutterActor *iter;
+  ClutterActor *last_child;
+
+  last_child = clutter_actor_get_last_child (CLUTTER_ACTOR (widget));
+  if (ST_IS_WIDGET (last_child))
+    st_widget_add_style_pseudo_class (ST_WIDGET (last_child), "last-child");
+
+  for (iter = clutter_actor_get_previous_sibling (last_child);
+       iter != NULL;
+       iter = clutter_actor_get_previous_sibling (iter))
+    if (ST_IS_WIDGET (iter))
+      st_widget_remove_style_pseudo_class (ST_WIDGET (iter), "last-child");
+}
+
+static void
 st_widget_init (StWidget *actor)
 {
   StWidgetPrivate *priv;
@@ -1430,6 +1504,9 @@ st_widget_init (StWidget *actor)
 
   /* connect style changed */
   g_signal_connect (actor, "notify::name", G_CALLBACK (st_widget_name_notify), NULL);
+
+  g_signal_connect (actor, "notify::first-child", G_CALLBACK (st_widget_first_child_notify), NULL);
+  g_signal_connect (actor, "notify::last-child", G_CALLBACK (st_widget_last_child_notify), NULL);
 }
 
 static void
@@ -2543,4 +2620,21 @@ check_labels (StWidgetAccessible *widget_accessible,
                                    ATK_RELATION_LABEL_FOR,
                                    ATK_OBJECT (widget_accessible));
     }
+}
+
+/**
+ * st_widget_get_focus_chain:
+ * @widget: An #StWidget
+ *
+ * Gets a list of the focusable children of @widget, in "Tab"
+ * order. By default, this returns all visible
+ * (as in CLUTTER_ACTOR_IS_VISIBLE()) children of @widget.
+ *
+ * Returns: (element-type Clutter.Actor) (transfer container):
+ *   @widget's focusable children
+ */
+GList *
+st_widget_get_focus_chain (StWidget *widget)
+{
+  return ST_WIDGET_GET_CLASS (widget)->get_focus_chain (widget);
 }

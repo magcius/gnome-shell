@@ -1163,7 +1163,7 @@ load_from_pixbuf (GdkPixbuf *pixbuf)
 typedef struct {
   gchar *path;
   gint   grid_width, grid_height;
-  ClutterGroup *group;
+  ClutterActor *actor;
 } AsyncImageData;
 
 static void
@@ -1171,7 +1171,7 @@ on_data_destroy (gpointer data)
 {
   AsyncImageData *d = (AsyncImageData *)data;
   g_free (d->path);
-  g_object_unref (d->group);
+  g_object_unref (d->actor);
   g_free (d);
 }
 
@@ -1191,7 +1191,7 @@ on_sliced_image_loaded (GObject *source_object,
     {
       ClutterActor *actor = load_from_pixbuf (GDK_PIXBUF (list->data));
       clutter_actor_hide (actor);
-      clutter_container_add_actor (CLUTTER_CONTAINER (data->group), actor);
+      clutter_actor_add_child (data->actor, actor);
     }
 }
 
@@ -1253,9 +1253,9 @@ load_sliced_image (GSimpleAsyncResult *result,
  * note that the dimensions of the image loaded from @path 
  * should be a multiple of the specified grid dimensions.
  *
- * Returns: (transfer none): A new #ClutterGroup
+ * Returns: (transfer none): A new #ClutterActor
  */
-ClutterGroup *
+ClutterActor *
 st_texture_cache_load_sliced_image (StTextureCache    *cache,
                                     const gchar       *path,
                                     gint               grid_width,
@@ -1263,14 +1263,14 @@ st_texture_cache_load_sliced_image (StTextureCache    *cache,
 {
   AsyncImageData *data;
   GSimpleAsyncResult *result;
-  ClutterGroup *group = CLUTTER_GROUP (clutter_group_new ());
+  ClutterActor *actor = clutter_actor_new ();
 
   data = g_new0 (AsyncImageData, 1);
   data->grid_width = grid_width;
   data->grid_height = grid_height;
   data->path = g_strdup (path);
-  data->group = group;
-  g_object_ref (G_OBJECT (group));
+  data->actor = actor;
+  g_object_ref (G_OBJECT (actor));
 
   result = g_simple_async_result_new (G_OBJECT (cache), on_sliced_image_loaded, data, st_texture_cache_load_sliced_image);
 
@@ -1279,7 +1279,7 @@ st_texture_cache_load_sliced_image (StTextureCache    *cache,
 
   g_object_unref (result);
 
-  return group;
+  return actor;
 }
 
 /**

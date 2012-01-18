@@ -25,7 +25,7 @@ static void shell_generic_container_iface_init (ClutterContainerIface *iface);
 
 G_DEFINE_TYPE_WITH_CODE(ShellGenericContainer,
                         shell_generic_container,
-                        ST_TYPE_CONTAINER,
+                        ST_TYPE_WIDGET,
                         G_IMPLEMENT_INTERFACE (CLUTTER_TYPE_CONTAINER,
                                                shell_generic_container_iface_init));
 
@@ -125,15 +125,14 @@ static void
 shell_generic_container_paint (ClutterActor  *actor)
 {
   ShellGenericContainer *self = (ShellGenericContainer*) actor;
-  GList *iter, *children;
+  ClutterActor *child;
 
   CLUTTER_ACTOR_CLASS (shell_generic_container_parent_class)->paint (actor);
 
-  children = st_container_get_children_list (ST_CONTAINER (actor));
-  for (iter = children; iter; iter = iter->next)
+  for (child = clutter_actor_get_first_child (actor);
+       child != NULL;
+       child = clutter_actor_get_next_sibling (child))
     {
-      ClutterActor *child = iter->data;
-
       if (g_hash_table_lookup (self->priv->skip_paint, child))
         continue;
 
@@ -146,15 +145,14 @@ shell_generic_container_pick (ClutterActor        *actor,
                               const ClutterColor  *color)
 {
   ShellGenericContainer *self = (ShellGenericContainer*) actor;
-  GList *iter, *children;
+  ClutterActor *child;
 
   CLUTTER_ACTOR_CLASS (shell_generic_container_parent_class)->pick (actor, color);
 
-  children = st_container_get_children_list (ST_CONTAINER (actor));
-  for (iter = children; iter; iter = iter->next)
+  for (child = clutter_actor_get_first_child (actor);
+       child != NULL;
+       child = clutter_actor_get_next_sibling (child))
     {
-      ClutterActor *child = iter->data;
-
       if (g_hash_table_lookup (self->priv->skip_paint, child))
         continue;
 
@@ -163,16 +161,17 @@ shell_generic_container_pick (ClutterActor        *actor,
 }
 
 static GList *
-shell_generic_container_get_focus_chain (StContainer *container)
+shell_generic_container_get_focus_chain (StWidget *widget)
 {
-  ShellGenericContainer *self = SHELL_GENERIC_CONTAINER (container);
-  GList *children, *focus_chain;
+  ShellGenericContainer *self = SHELL_GENERIC_CONTAINER (widget);
+  ClutterActor *child;
+  GList *focus_chain;
 
   focus_chain = NULL;
-  for (children = st_container_get_children_list (container); children; children = children->next)
+  for (child = clutter_actor_get_first_child (CLUTTER_ACTOR (self));
+       child != NULL;
+       child = clutter_actor_get_next_sibling (child))
     {
-      ClutterActor *child = children->data;
-
       if (CLUTTER_ACTOR_IS_VISIBLE (child) &&
           !shell_generic_container_get_skip_paint (self, child))
         focus_chain = g_list_prepend (focus_chain, child);
@@ -252,7 +251,7 @@ shell_generic_container_class_init (ShellGenericContainerClass *klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
   ClutterActorClass *actor_class = CLUTTER_ACTOR_CLASS (klass);
-  StContainerClass *container_class = ST_CONTAINER_CLASS (klass);
+  StWidgetClass *widget_class = ST_WIDGET_CLASS (klass);
 
   gobject_class->finalize = shell_generic_container_finalize;
 
@@ -262,7 +261,7 @@ shell_generic_container_class_init (ShellGenericContainerClass *klass)
   actor_class->paint = shell_generic_container_paint;
   actor_class->pick = shell_generic_container_pick;
 
-  container_class->get_focus_chain = shell_generic_container_get_focus_chain;
+  widget_class->get_focus_chain = shell_generic_container_get_focus_chain;
 
   /**
    * ShellGenericContainer::get-preferred-width:
