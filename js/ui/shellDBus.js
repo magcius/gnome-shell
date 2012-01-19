@@ -6,8 +6,10 @@ const GLib = imports.gi.GLib;
 
 const Config = imports.misc.config;
 const ExtensionSystem = imports.ui.extensionSystem;
+const ExtensionUtils = imports.misc.extensionUtils;
 const Flashspot = imports.ui.flashspot;
 const Main = imports.ui.main;
+const Util = imports.misc.util;
 
 const GnomeShellIface = <interface name="org.gnome.Shell">
 <method name="Eval">
@@ -59,6 +61,13 @@ const GnomeShellIface = <interface name="org.gnome.Shell">
 <method name="UninstallExtension">
     <arg type="s" direction="in" name="uuid"/>
     <arg type="b" direction="out" name="success"/>
+</method>
+<method name="LaunchExtensionPrefs">
+    <arg type="s" direction="in" name="uuid"/>
+</method>
+<method name="ExtensionHasPrefs">
+    <arg type="s" direction="in" name="uuid"/>
+    <arg type="b" direction="out" name="result"/>
 </method>
 <property name="OverviewActive" type="b" access="readwrite" />
 <property name="ApiVersion" type="i" access="read" />
@@ -230,6 +239,17 @@ const GnomeShell = new Lang.Class({
 
     UninstallExtension: function(uuid) {
         return ExtensionSystem.uninstallExtensionFromUUID(uuid);
+    },
+
+    LaunchExtensionPrefs: function(uuid) {
+        Util.spawn(['gnome-shell-extension-prefs', uuid]);
+    },
+
+    ExtensionHasPrefs: function(uuid) {
+        let dir = ExtensionUtils.locateExtension(uuid);
+        if (!dir)
+            return false;
+        return dir.get_child('prefs.js').query_exists(null);
     },
 
     get OverviewActive() {

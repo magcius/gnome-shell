@@ -122,6 +122,21 @@ function init() {
     }
 }
 
+function locateExtension(uuid) {
+    let systemDataDirs = GLib.get_system_data_dirs();
+    for (let i = 0; i < systemDataDirs.length; i++) {
+        let dir = Gio.file_new_for_path(systemDataDirs[i]).get_child(uuid);
+        if (dir.query_exists(null))
+            return dir;
+    }
+
+    let dir = userExtensionsDir.get_child(uuid);
+    if (dir.query_exists(null))
+        return dir;
+
+    return null;
+}
+
 function scanExtensionsInDirectory(callback, dir, type) {
     let fileEnum;
     let file, info;
