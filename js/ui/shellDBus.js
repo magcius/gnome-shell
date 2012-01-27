@@ -130,7 +130,7 @@ const GnomeShell = new Gio.DBusImplementerClass({
             flashspot.fire();
         }
 
-        let retval = GLib.Variant.new('(b)', [result]);
+        let retval = new GLib.Variant('(b)', [result]);
         invocation.return_value(retval);
     },
 
@@ -212,7 +212,7 @@ const GnomeShell = new Gio.DBusImplementerClass({
             default:
                 continue;
             }
-            out[key] = GLib.Variant.new(type, val);
+            out[key] = new GLib.Variant(type, val);
         }
         return out;
     },

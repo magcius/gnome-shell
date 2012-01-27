@@ -242,7 +242,7 @@ const NotificationDaemon = new Gio.DBusImplementerClass({
                                         function () {
                                             this.emit_signal('NotificationClosed', id, NotificationClosedReason.DISMISSED);
                                         }));
-            return invocation.return_value(GLib.Variant.new('(u)', [id]));
+            return invocation.return_value(new GLib.Variant('(u)', [id]));
         }
 
         let rewrites = rewriteRules[appName];
@@ -297,14 +297,14 @@ const NotificationDaemon = new Gio.DBusImplementerClass({
 
         if (source) {
             this._notifyForSource(source, ndata);
-            return invocation.return_value(GLib.Variant.new('(u)', [id]));
+            return invocation.return_value(new GLib.Variant('(u)', [id]));
         }
 
         if (replacesId) {
             // There's already a pending call to GetConnectionUnixProcessID,
             // which will see the new notification data when it finishes,
             // so we don't have to do anything.
-            return invocation.return_value(GLib.Variant.new('(u)', [id]));;
+            return invocation.return_value(new GLib.Variant('(u)', [id]));;
         }
 
         this._busProxy.GetConnectionUnixProcessIDRemote(sender, Lang.bind(this, function (result, excp) {
@@ -338,7 +338,7 @@ const NotificationDaemon = new Gio.DBusImplementerClass({
             this._notifyForSource(source, ndata);
         }));
 
-        return invocation.return_value(GLib.Variant.new('(u)', [id]));
+        return invocation.return_value(new GLib.Variant('(u)', [id]));
     },
 
     _notifyForSource: function(source, ndata) {
