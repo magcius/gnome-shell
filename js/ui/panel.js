@@ -81,10 +81,10 @@ function _over(srcColor, dstColor) {
 }
 
 function _premultiply(color) {
-    return new Clutter.Color({ red: _norm(color.red * color.alpha),
-                               green: _norm(color.green * color.alpha),
-                               blue: _norm(color.blue * color.alpha),
-                               alpha: color.alpha });
+    return new Clutter.Color(_norm(color.red * color.alpha),
+                             _norm(color.green * color.alpha),
+                             _norm(color.blue * color.alpha),
+                             color.alpha);
 };
 
 function _unpremultiply(color) {
@@ -94,8 +94,7 @@ function _unpremultiply(color) {
     let red = Math.min((color.red * 255 + 127) / color.alpha, 255);
     let green = Math.min((color.green * 255 + 127) / color.alpha, 255);
     let blue = Math.min((color.blue * 255 + 127) / color.alpha, 255);
-    return new Clutter.Color({ red: red, green: green,
-                               blue: blue, alpha: color.alpha });
+    return new Clutter.Color(red, green, blue, color.alpha);
 };
 
 

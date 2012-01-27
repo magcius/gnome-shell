@@ -502,9 +502,7 @@ const Dash = new Lang.Class({
 
 
         let themeNode = this._box.get_theme_node();
-        let maxAllocation = new Clutter.ActorBox({ x1: 0, y1: 0,
-                                                   x2: 42 /* whatever */,
-                                                   y2: this._maxHeight });
+        let maxAllocation = new Clutter.ActorBox(0, 0, 42 /* whatever */, this._maxHeight);
         let maxContent = themeNode.get_content_box(maxAllocation);
         let availHeight = maxContent.y2 - maxContent.y1;
         let spacing = themeNode.get_length('spacing');
