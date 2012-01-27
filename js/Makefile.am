@@ -9,6 +9,7 @@ nobase_dist_js_DATA = 	\
 	gdm/powerMenu.js	\
 	extensionPrefs/main.js	\
 	misc/config.js		\
+	misc/consoleKit.js	\
 	misc/docInfo.js		\
 	misc/extensionUtils.js	\
 	misc/fileUtils.js	\

@@ -22,7 +22,13 @@ const GnomeShellIface = <interface name="org.gnome.Shell">
 </signal>
 </interface>;
 
-const GnomeShellProxy = Gio.DBusProxy.makeProxyWrapper(GnomeShellIface);
+const GnomeShellProxy = new Gio.DBusProxyClass({
+    Name: 'GnomeShellProxy',
+    Interface: GnomeShellIface,
+    BusType: Gio.BusType.SESSION,
+    BusName: 'org.gnome.Shell',
+    ObjectPath: '/org/gnome/Shell'
+});
 
 // Ugly hack until GTK+ is fixed to support arbitrary
 // CSS on any widget.
@@ -208,7 +214,7 @@ const Application = new Lang.Class({
 
         this._extensionPrefsBin.add(label);
 
-        this._shellProxy = new GnomeShellProxy(Gio.DBus.session, 'org.gnome.Shell', '/org/gnome/Shell');
+        this._shellProxy = new GnomeShellProxy();
         this._shellProxy.connectSignal('ExtensionStatusChanged', Lang.bind(this, function(proxy, senderName, [uuid, state, error]) {
             if (!this._extensionMetas.hasOwnProperty(uuid))
                 this._scanExtensions();

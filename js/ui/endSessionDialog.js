@@ -57,6 +57,22 @@ const EndSessionDialogIface = <interface name="org.gnome.SessionManager.EndSessi
 <signal name="Closed" />
 </interface>;
 
+const EndSessionDialogImpl = new Gio.DBusImplementerClass({
+    Name: 'EndSessionDialogImpl',
+    Interface: EndSessionDialogIface,
+    BusType: Gio.BusType.SESSION,
+    ObjectPath: '/org/gnome/SessionManager/EndSessionDialog',
+
+    _init: function(dialog) {
+        this._dialog = this;
+        this.parent();
+    },
+
+    OpenAsync: function(params, invocation) {
+        this._dialog.OpenAsync(params, invocation);
+    }
+});
+
 const logoutDialogContent = {
     subjectWithUser: C_("title", "Log Out %s"),
     subject: C_("title", "Log Out"),
@@ -316,8 +332,7 @@ const EndSessionDialog = new Lang.Class({
                                               scrollView.hide();
                                       }));
 
-        this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(EndSessionDialogIface, this);
-        this._dbusImpl.export(Gio.DBus.session, '/org/gnome/SessionManager/EndSessionDialog');
+        this._dbusImpl = new EndSessionDialogImpl(this);
     },
 
     _onDestroy: function() {
@@ -511,10 +526,12 @@ const EndSessionDialog = new Lang.Class({
         }
 
         for (let i = 0; i < inhibitorObjectPaths.length; i++) {
-            let inhibitor = new GnomeSession.Inhibitor(inhibitorObjectPaths[i], Lang.bind(this, function(proxy, error) {
-                this._onInhibitorLoaded(proxy);
-            }));
-
+            let inhibitor = new GnomeSession.Inhibitor({
+                g_object_path: inhibitorObjectPaths[i],
+                g_async_callback: Lang.bind(this, function(proxy, error) {
+                    this._onInhibitorLoaded(proxy);
+                })
+            });
             this._inhibitors.push(inhibitor);
         }
 

@@ -191,14 +191,14 @@ const Key = new Lang.Class({
     }
 });
 
-const Keyboard = new Lang.Class({
-    // HACK: we can't set Name, because it collides with Name dbus property
-    // Name: 'Keyboard',
+const Keyboard = new Gio.DBusImplementerClass({
+    Name: 'Keyboard',
+    Interface: CaribouKeyboardIface,
+    BusType: Gio.BusType.SESSION,
+    ObjectPath: '/org/gnome/Caribou/Keyboard',
 
     _init: function () {
-        this._impl = Gio.DBusExportedObject.wrapJSObject(CaribouKeyboardIface, this);
-        this._impl.export(Gio.DBus.session, '/org/gnome/Caribou/Keyboard');
-
+        this.parent();
         this.actor = null;
 
         this._timestamp = global.get_current_time();
@@ -526,7 +526,7 @@ const Keyboard = new Lang.Class({
 //        this._setLocation(x, y);
     },
 
-    get Name() {
+    get DBusName() {
         return 'gnome-shell';
     }
 });

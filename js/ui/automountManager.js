@@ -5,6 +5,7 @@ const Mainloop = imports.mainloop;
 const Gio = imports.gi.Gio;
 const Params = imports.misc.params;
 
+const ConsoleKit = imports.misc.consoleKit;
 const Main = imports.ui.main;
 const ShellMountOperation = imports.ui.shellMountOperation;
 const ScreenSaver = imports.misc.screenSaver;
@@ -15,55 +16,6 @@ const SETTING_ENABLE_AUTOMOUNT = 'automount';
 
 const AUTORUN_EXPIRE_TIMEOUT_SECS = 10;
 
-const ConsoleKitSessionIface = <interface name="org.freedesktop.ConsoleKit.Session">
-<method name="IsActive">
-    <arg type="b" direction="out" />
-</method>
-<signal name="ActiveChanged">
-    <arg type="b" direction="out" />
-</signal>
-</interface>;
-
-const ConsoleKitSessionProxy = Gio.DBusProxy.makeProxyWrapper(ConsoleKitSessionIface);
-
-const ConsoleKitManagerIface = <interface name="org.freedesktop.ConsoleKit.Manager">
-<method name="GetCurrentSession">
-    <arg type="o" direction="out" />
-</method>
-</interface>;
-
-const ConsoleKitManagerInfo = Gio.DBusInterfaceInfo.new_for_xml(ConsoleKitManagerIface);
-
-function ConsoleKitManager() {
-    var self = new Gio.DBusProxy({ g_connection: Gio.DBus.system,
-				   g_interface_name: ConsoleKitManagerInfo.name,
-				   g_interface_info: ConsoleKitManagerInfo,
-				   g_name: 'org.freedesktop.ConsoleKit',
-				   g_object_path: '/org/freedesktop/ConsoleKit/Manager',
-                                   g_flags: (Gio.DBusProxyFlags.DO_NOT_AUTO_START |
-                                             Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES) });
-
-    self.connect('notify::g-name-owner', function() {
-        if (self.g_name_owner) {
-            self.GetCurrentSessionRemote(function([session]) {
-                self._ckSession = new ConsoleKitSessionProxy(Gio.DBus.system, 'org.freedesktop.ConsoleKit', session);
-
-                self._ckSession.connectSignal('ActiveChanged', function(object, senderName, [isActive]) {
-                    self.sessionActive = isActive;
-                });
-                self._ckSession.IsActiveRemote(function([isActive]) {
-                    self.sessionActive = isActive;
-                });
-            });
-        } else {
-            self.sessionActive = true;
-        }
-    });
-
-    self.init(null);
-    return self;
-}
-
 const AutomountManager = new Lang.Class({
     Name: 'AutomountManager',
 
@@ -71,7 +23,7 @@ const AutomountManager = new Lang.Class({
         this._settings = new Gio.Settings({ schema: SETTINGS_SCHEMA });
         this._volumeQueue = [];
 
-        this.ckListener = new ConsoleKitManager();
+        this.ckListener = new ConsoleKit.ConsoleKitManager();
 
         this._ssProxy = new ScreenSaver.ScreenSaverProxy();
         this._ssProxy.connectSignal('ActiveChanged',

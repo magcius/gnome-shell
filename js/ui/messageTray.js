@@ -1337,9 +1337,11 @@ const MessageTray = new Lang.Class({
     Name: 'MessageTray',
 
     _init: function() {
-        this._presence = new GnomeSession.Presence(Lang.bind(this, function(proxy, error) {
-            this._onStatusChanged(proxy.status);
-        }));
+        this._presence = new GnomeSession.Presence({
+            g_async_callback: Lang.bind(this, function(proxy, error) {
+                this._onStatusChanged(proxy.status);
+            })
+        });
         this._userStatus = GnomeSession.PresenceStatus.AVAILABLE;
         this._busy = false;
         this._backFromAway = false;

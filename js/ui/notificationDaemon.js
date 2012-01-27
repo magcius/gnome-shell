@@ -24,10 +24,13 @@ const BusIface = <interface name="org.freedesktop.DBus">
 </method>
 </interface>;
 
-var BusProxy = Gio.DBusProxy.makeProxyWrapper(BusIface);
-function Bus() {
-    return new BusProxy(Gio.DBus.session, 'org.freedesktop.DBus', '/org/freedesktop/DBus');
-}
+const Bus = new Gio.DBusProxyClass({
+    Name: 'Bus',
+    Interface: BusIface,
+    BusType: Gio.BusType.SESSION,
+    BusName: 'org.freedesktop.DBus',
+    ObjectPath: '/org/freedesktop/DBus'
+});
 
 const NotificationDaemonIface = <interface name="org.freedesktop.Notifications">
 <method name="Notify">
@@ -87,12 +90,14 @@ const rewriteRules = {
     ]
 };
 
-const NotificationDaemon = new Lang.Class({
+const NotificationDaemon = new Gio.DBusImplementerClass({
     Name: 'NotificationDaemon',
+    Interface: NotificationDaemonIface,
+    BusType: Gio.BusType.SESSION,
+    ObjectPath: '/org/freedesktop/Notifications',
 
     _init: function() {
-        this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(NotificationDaemonIface, this);
-        this._dbusImpl.export(Gio.DBus.session, '/org/freedesktop/Notifications');
+        this.parent();
 
         this._sources = [];
         this._senderToPid = {};
@@ -235,7 +240,7 @@ const NotificationDaemon = new Lang.Class({
             id = nextNotificationId++;
             Mainloop.idle_add(Lang.bind(this,
                                         function () {
-                                            this._emitNotificationClosed(id, NotificationClosedReason.DISMISSED);
+                                            this.emit_signal('NotificationClosed', id, NotificationClosedReason.DISMISSED);
                                         }));
             return invocation.return_value(GLib.Variant.new('(u)', [id]));
         }
@@ -363,11 +368,11 @@ const NotificationDaemon = new Lang.Class({
                             notificationClosedReason = NotificationClosedReason.APP_CLOSED;
                             break;
                     }
-                    this._emitNotificationClosed(ndata.id, notificationClosedReason);
+                    this.emit_signal('NotificationClosed', ndata.id, notificationClosedReason);
                 }));
             notification.connect('action-invoked', Lang.bind(this,
                 function(n, actionId) {
-                    this._emitActionInvoked(ndata.id, actionId);
+                    this.emit_signal('ActionInvoked', id, actionId);
                 }));
         } else {
             notification.update(summary, body, { icon: iconActor,
@@ -399,7 +404,7 @@ const NotificationDaemon = new Lang.Class({
                 if (actions[i] == 'default')
                     notification.connect('clicked', Lang.bind(this,
                         function() {
-                            this._emitActionInvoked(ndata.id, "default");
+                            this.emit_signal('ActionInvoked', id, 'default');
                         }));
                 else
                     notification.addButton(actions[i], actions[i + 1]);
@@ -470,16 +475,6 @@ const NotificationDaemon = new Lang.Class({
                 return;
             }
         }
-    },
-
-    _emitNotificationClosed: function(id, reason) {
-        this._dbusImpl.emit_signal('NotificationClosed',
-                                   GLib.Variant.new('(uu)', [id, reason]));
-    },
-
-    _emitActionInvoked: function(id, action) {
-        this._dbusImpl.emit_signal('ActionInvoked',
-                                   GLib.Variant.new('(us)', [id, action]));
     },
 
     _onTrayIconAdded: function(o, icon) {

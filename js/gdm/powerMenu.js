@@ -21,7 +21,7 @@
 const Lang = imports.lang;
 const UPowerGlib = imports.gi.UPowerGlib;
 
-const ConsoleKit = imports.gdm.consoleKit;
+const ConsoleKit = imports.misc.consoleKit;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 

@@ -741,11 +741,11 @@ const NMDeviceModem = new Lang.Class({
         this._capabilities = device.current_capabilities;
         if (this._capabilities & NetworkManager.DeviceModemCapabilities.GSM_UMTS) {
             is_wwan = true;
-            this.mobileDevice = new ModemManager.ModemGsm(device.udi);
+            this.mobileDevice = new ModemManager.ModemGsm({ g_object_path: device.udi });
             this._connectionType = NetworkManager.SETTING_GSM_SETTING_NAME;
         } else if (this._capabilities & NetworkManager.DeviceModemCapabilities.CDMA_EVDO) {
             is_wwan = true;
-            this.mobileDevice = new ModemManager.ModemCdma(device.udi);
+            this.mobileDevice = new ModemManager.ModemCdma({ g_object_path: device.udi });
             this._connectionType = NetworkManager.SETTING_CDMA_SETTING_NAME;
         } else if (this._capabilities & NetworkManager.DeviceModemCapabilities.LTE) {
             is_wwan = true;

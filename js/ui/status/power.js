@@ -11,9 +11,6 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 const Util = imports.misc.util;
 
-const BUS_NAME = 'org.gnome.SettingsDaemon';
-const OBJECT_PATH = '/org/gnome/SettingsDaemon/Power';
-
 const UPDeviceType = {
     UNKNOWN: 0,
     AC_POWER: 1,
@@ -39,7 +36,7 @@ const UPDeviceState = {
     PENDING_DISCHARGE: 6
 };
 
-const PowerManagerInterface = <interface name="org.gnome.SettingsDaemon.Power">
+const PowerManagerIface = <interface name="org.gnome.SettingsDaemon.Power">
 <method name="GetDevices">
     <arg type="a(susdut)" direction="out" />
 </method>
@@ -50,7 +47,13 @@ const PowerManagerInterface = <interface name="org.gnome.SettingsDaemon.Power">
 <property name="Icon" type="s" access="read" />
 </interface>;
 
-const PowerManagerProxy = Gio.DBusProxy.makeProxyWrapper(PowerManagerInterface);
+const PowerManager = new Gio.DBusProxyClass({
+    Name: 'PowerManager',
+    Interface: PowerManagerIface,
+    BusType: Gio.BusType.SESSION,
+    BusName: 'org.gnome.SettingsDaemon',
+    ObjectPath: '/org/gnome/SettingsDaemon/Power'
+});
 
 const Indicator = new Lang.Class({
     Name: 'PowerIndicator',
@@ -59,7 +62,7 @@ const Indicator = new Lang.Class({
     _init: function() {
         this.parent('battery-missing', null, _("Battery"));
 
-        this._proxy = new PowerManagerProxy(Gio.DBus.session, BUS_NAME, OBJECT_PATH);
+        this._proxy = new PowerManager();
 
         this._deviceItems = [ ];
         this._hasPrimary = false;
