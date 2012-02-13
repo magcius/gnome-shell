@@ -187,7 +187,6 @@ function start() {
                         for (let i = 0; i < children.length; i++)
                             children[i].allocate_preferred_size(flags);
                     });
-    St.set_ui_root(global.stage, uiGroup);
     global.window_group.reparent(uiGroup);
     global.overlay_group.reparent(uiGroup);
     global.stage.add_actor(uiGroup);
