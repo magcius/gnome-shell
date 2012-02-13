@@ -759,10 +759,8 @@ st_widget_get_paint_volume (ClutterActor *self,
   ClutterActorBox paint_box, alloc_box;
   StThemeNode *theme_node;
   StWidgetPrivate *priv;
-  ClutterVertex origin;
 
-  /* Setting the paint volume does not make sense when we don't have any allocation */
-  if (!clutter_actor_has_allocation (self))
+  if (!CLUTTER_ACTOR_CLASS (st_widget_parent_class)->get_paint_volume (self, volume))
     return FALSE;
 
   priv = ST_WIDGET (self)->priv;
@@ -776,13 +774,7 @@ st_widget_get_paint_volume (ClutterActor *self,
   else
     st_theme_node_get_paint_box (theme_node, &alloc_box, &paint_box);
 
-  origin.x = paint_box.x1 - alloc_box.x1;
-  origin.y = paint_box.y1 - alloc_box.y1;
-  origin.z = 0.0f;
-
-  clutter_paint_volume_set_origin (volume, &origin);
-  clutter_paint_volume_set_width (volume, paint_box.x2 - paint_box.x1);
-  clutter_paint_volume_set_height (volume, paint_box.y2 - paint_box.y1);
+  clutter_paint_volume_union_box (volume, &paint_box);
 
   return TRUE;
 }

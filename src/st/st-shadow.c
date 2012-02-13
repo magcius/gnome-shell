@@ -150,29 +150,20 @@ st_shadow_get_box (StShadow              *shadow,
                    const ClutterActorBox *actor_box,
                    ClutterActorBox       *shadow_box)
 {
+  gdouble reach;
   g_return_if_fail (shadow != NULL);
   g_return_if_fail (actor_box != NULL);
   g_return_if_fail (shadow_box != NULL);
 
-  /* Inset shadows are drawn below the border, so returning
-   * the original box is not actually correct; still, it's
-   * good enough for the purpose of determing additional space
-   * required outside the actor box.
-   */
-  if (shadow->inset)
-    {
-      *shadow_box = *actor_box;
-      return;
-    }
+  reach = shadow->blur + shadow->spread;
 
-  shadow_box->x1 = actor_box->x1 + shadow->xoffset
-                   - shadow->blur - shadow->spread;
-  shadow_box->x2 = actor_box->x2 + shadow->xoffset
-                   + shadow->blur + shadow->spread;
-  shadow_box->y1 = actor_box->y1 + shadow->yoffset
-                   - shadow->blur - shadow->spread;
-  shadow_box->y2 = actor_box->y2 + shadow->yoffset
-                   + shadow->blur + shadow->spread;
+  if (shadow->inset)
+    reach *= -1;
+
+  shadow_box->x1 = shadow->xoffset - reach;
+  shadow_box->x2 = actor_box->x2 + shadow->xoffset + reach;
+  shadow_box->y1 = shadow->yoffset - reach;
+  shadow_box->y2 = actor_box->y2 + shadow->yoffset + reach;
 }
 
 GType

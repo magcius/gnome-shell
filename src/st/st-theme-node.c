@@ -3361,7 +3361,11 @@ st_theme_node_get_background_paint_box (StThemeNode           *node,
 
   background_image_shadow = st_theme_node_get_background_image_shadow (node);
 
-  *paint_box = *actor_box;
+  /* The paint box should be in the actor's coordinate space. */
+  paint_box->x1 = 0;
+  paint_box->y1 = 0;
+  paint_box->x2 = actor_box->x2 - actor_box->x1;
+  paint_box->y2 = actor_box->y2 - actor_box->y1;
 
   if (!background_image_shadow)
     return;
