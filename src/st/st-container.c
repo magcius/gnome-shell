@@ -53,24 +53,6 @@ st_container_foreach (ClutterContainer *container,
   g_list_foreach (clutter_actor_get_children (CLUTTER_ACTOR (container)), (GFunc) callback, user_data);
 }
 
-void
-st_container_move_child (StContainer  *container,
-                         ClutterActor *actor,
-                         int           pos)
-{
-  clutter_actor_set_child_at_index (CLUTTER_ACTOR (container),
-                                    actor, pos);
-}
-
-void
-st_container_move_before (StContainer  *container,
-                          ClutterActor *actor,
-                          ClutterActor *sibling)
-{
-  clutter_actor_set_child_below_sibling (CLUTTER_ACTOR (container),
-                                         actor, sibling);
-}
-
 /* filter @children to contain only only actors that overlap @rbox
  * when moving in @direction. (Assuming no transformations.)
  */
