@@ -182,40 +182,6 @@ st_container_get_children_list (StContainer *container)
   return container->priv->children;
 }
 
-static GList *
-st_container_real_get_focus_chain (StContainer *container)
-{
-  GList *chain, *children;
-
-  chain = NULL;
-  for (children = container->priv->children; children; children = children->next)
-    {
-      ClutterActor *child = children->data;
-
-      if (CLUTTER_ACTOR_IS_VISIBLE (child))
-        chain = g_list_prepend (chain, child);
-    }
-
-  return g_list_reverse (chain);
-}
-
-/**
- * st_container_get_focus_chain:
- * @container: An #StContainer
- *
- * Gets a list of the focusable children of @container, in "Tab"
- * order. By default, this returns all visible
- * (as in CLUTTER_ACTOR_IS_VISIBLE()) children of @container.
- *
- * Returns: (element-type Clutter.Actor) (transfer container):
- *   @container's focusable children
- */
-GList *
-st_container_get_focus_chain (StContainer *container)
-{
-  return ST_CONTAINER_GET_CLASS (container)->get_focus_chain (container);
-}
-
 static gint
 sort_z_order (gconstpointer a,
               gconstpointer b)
@@ -649,7 +615,7 @@ st_container_navigate_focus (StWidget         *widget,
    * "first" being determined by @direction.)
    */
 
-  children = st_container_get_focus_chain (container);
+  children = st_widget_get_focus_chain (ST_WIDGET (container));
   if (direction == GTK_DIR_TAB_FORWARD ||
       direction == GTK_DIR_TAB_BACKWARD)
     {
@@ -761,6 +727,4 @@ st_container_class_init (StContainerClass *klass)
   actor_class->get_paint_volume = st_container_get_paint_volume;
 
   widget_class->navigate_focus = st_container_navigate_focus;
-
-  container_class->get_focus_chain = st_container_real_get_focus_chain;
 }
