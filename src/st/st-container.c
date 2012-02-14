@@ -28,142 +28,7 @@
 
 #include "st-container.h"
 
-#define ST_CONTAINER_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj),ST_TYPE_CONTAINER, StContainerPrivate))
-
-struct _StContainerPrivate
-{
-  GList *children;
-  ClutterActor *first_child;
-  ClutterActor *last_child;
-  gboolean block_update_pseudo_classes;
-};
-
-static void clutter_container_iface_init (ClutterContainerIface *iface);
-
-G_DEFINE_ABSTRACT_TYPE_WITH_CODE (StContainer, st_container, ST_TYPE_WIDGET,
-                                  G_IMPLEMENT_INTERFACE (CLUTTER_TYPE_CONTAINER,
-                                                         clutter_container_iface_init));
-
-static void
-st_container_update_pseudo_classes (StContainer *container)
-{
-  GList *first_item, *last_item;
-  ClutterActor *first_child, *last_child;
-  StContainerPrivate *priv = container->priv;
-
-  if (priv->block_update_pseudo_classes)
-    return;
-
-  first_item = priv->children;
-  first_child = first_item ? first_item->data : NULL;
-  if (first_child != priv->first_child)
-    {
-      if (priv->first_child && ST_IS_WIDGET (priv->first_child))
-        st_widget_remove_style_pseudo_class (ST_WIDGET (priv->first_child),
-                                             "first-child");
-      if (priv->first_child)
-        {
-          g_object_unref (priv->first_child);
-          priv->first_child = NULL;
-        }
-
-      if (first_child && ST_IS_WIDGET (first_child))
-        st_widget_add_style_pseudo_class (ST_WIDGET (first_child),
-                                          "first-child");
-      if (first_child)
-        priv->first_child = g_object_ref (first_child);
-    }
-
-  last_item = g_list_last (priv->children);
-  last_child = last_item ? last_item->data : NULL;
-  if (last_child != priv->last_child)
-    {
-      if (priv->last_child && ST_IS_WIDGET (priv->last_child))
-        st_widget_remove_style_pseudo_class (ST_WIDGET (priv->last_child),
-                                             "last-child");
-      if (priv->last_child)
-        {
-          g_object_unref (priv->last_child);
-          priv->last_child = NULL;
-        }
-
-      if (last_child && ST_IS_WIDGET (last_child))
-        st_widget_add_style_pseudo_class (ST_WIDGET (last_child),
-                                          "last-child");
-      if (last_child)
-        priv->last_child = g_object_ref (last_child);
-    }
-}
-
-/**
- * st_container_destroy_children:
- * @container: An #StContainer
- *
- * Destroys all child actors from @container.
- */
-void
-st_container_destroy_children (StContainer *container)
-{
-  StContainerPrivate *priv = container->priv;
-
-  priv->block_update_pseudo_classes = TRUE;
-
-  while (priv->children)
-    clutter_actor_destroy (priv->children->data);
-
-  priv->block_update_pseudo_classes = FALSE;
-
-  st_container_update_pseudo_classes (container);
-}
-
-void
-st_container_move_child (StContainer  *container,
-                         ClutterActor *actor,
-                         int           pos)
-{
-  StContainerPrivate *priv = container->priv;
-  GList *item = NULL;
-
-  item = g_list_find (priv->children, actor);
-
-  if (item == NULL)
-    {
-      g_warning ("Actor of type '%s' is not a child of the %s container",
-                 g_type_name (G_OBJECT_TYPE (actor)),
-                 g_type_name (G_OBJECT_TYPE (container)));
-      return;
-    }
-
-  priv->children = g_list_delete_link (priv->children, item);
-  priv->children = g_list_insert (priv->children, actor, pos);
-
-  st_container_update_pseudo_classes (container);
-
-  clutter_actor_queue_relayout ((ClutterActor*) container);
-}
-
-void
-st_container_move_before (StContainer  *container,
-                          ClutterActor *actor,
-                          ClutterActor *sibling)
-{
-  StContainerPrivate *priv = container->priv;
-  GList *actor_item = NULL;
-  GList *sibling_item = NULL;
-
-  actor_item = g_list_find (priv->children, actor);
-  sibling_item = g_list_find (priv->children, sibling);
-
-  g_return_if_fail (actor_item != NULL);
-  g_return_if_fail (sibling_item != NULL);
-
-  priv->children = g_list_delete_link (priv->children, actor_item);
-  priv->children = g_list_insert_before (priv->children, sibling_item, actor);
-
-  st_container_update_pseudo_classes (container);
-
-  clutter_actor_queue_relayout (CLUTTER_ACTOR (container));
-}
+G_DEFINE_ABSTRACT_TYPE (StContainer, st_container, ST_TYPE_WIDGET);
 
 /**
  * st_container_get_children_list:
@@ -177,79 +42,7 @@ st_container_move_before (StContainer  *container,
 GList *
 st_container_get_children_list (StContainer *container)
 {
-  g_return_val_if_fail (ST_IS_CONTAINER (container), NULL);
-
-  return container->priv->children;
-}
-
-static gint
-sort_z_order (gconstpointer a,
-              gconstpointer b)
-{
-  float depth_a, depth_b;
-
-  depth_a = clutter_actor_get_depth (CLUTTER_ACTOR (a));
-  depth_b = clutter_actor_get_depth (CLUTTER_ACTOR (b));
-
-  if (depth_a < depth_b)
-    return -1;
-  if (depth_a > depth_b)
-    return 1;
-  return 0;
-}
-
-static void
-st_container_add (ClutterContainer *container,
-                  ClutterActor     *actor)
-{
-  StContainerPrivate *priv = ST_CONTAINER (container)->priv;
-
-  g_object_ref (actor);
-
-  priv->children = g_list_append (priv->children, actor);
-  clutter_actor_set_parent (actor, CLUTTER_ACTOR (container));
-
-  /* queue a relayout, to get the correct positioning inside
-   * the ::actor-added signal handlers
-   */
-  clutter_actor_queue_relayout (CLUTTER_ACTOR (container));
-
-  g_signal_emit_by_name (container, "actor-added", actor);
-
-  clutter_container_sort_depth_order (container);
-  st_container_update_pseudo_classes (ST_CONTAINER (container));
-
-  g_object_unref (actor);
-}
-
-static void
-st_container_remove (ClutterContainer *container,
-                     ClutterActor     *actor)
-{
-  StContainerPrivate *priv = ST_CONTAINER (container)->priv;
-
-  g_object_ref (actor);
-
-  priv->children = g_list_remove (priv->children, actor);
-  clutter_actor_unparent (actor);
-
-  /* queue a relayout, to get the correct positioning inside
-   * the ::actor-removed signal handlers
-   */
-  clutter_actor_queue_relayout (CLUTTER_ACTOR (container));
-
-  /* at this point, the actor passed to the "actor-removed" signal
-   * handlers is not parented anymore to the container but since we
-   * are holding a reference on it, it's still valid
-   */
-  g_signal_emit_by_name (container, "actor-removed", actor);
-
-  st_container_update_pseudo_classes (ST_CONTAINER (container));
-
-  if (CLUTTER_ACTOR_IS_VISIBLE (container))
-    clutter_actor_queue_redraw (CLUTTER_ACTOR (container));
-
-  g_object_unref (actor);
+  return clutter_actor_get_children (CLUTTER_ACTOR (container));
 }
 
 static void
@@ -257,171 +50,25 @@ st_container_foreach (ClutterContainer *container,
                       ClutterCallback   callback,
                       gpointer          user_data)
 {
-  StContainerPrivate *priv = ST_CONTAINER (container)->priv;
-
-  /* Using g_list_foreach instead of iterating the list manually
-   * because it has better protection against the current node being
-   * removed. This will happen for example if someone calls
-   * clutter_container_foreach(container, clutter_actor_destroy)
-   */
-  g_list_foreach (priv->children, (GFunc) callback, user_data);
+  g_list_foreach (clutter_actor_get_children (CLUTTER_ACTOR (container)), (GFunc) callback, user_data);
 }
 
-static void
-st_container_raise (ClutterContainer *container,
-                    ClutterActor     *actor,
-                    ClutterActor     *sibling)
+void
+st_container_move_child (StContainer  *container,
+                         ClutterActor *actor,
+                         int           pos)
 {
-  StContainerPrivate *priv = ST_CONTAINER (container)->priv;
-
-  priv->children = g_list_remove (priv->children, actor);
-
-  /* Raise at the top */
-  if (!sibling)
-    {
-      GList *last_item;
-
-      last_item = g_list_last (priv->children);
-
-      if (last_item)
-        sibling = last_item->data;
-
-      priv->children = g_list_append (priv->children, actor);
-    }
-  else
-    {
-      gint pos;
-
-      pos = g_list_index (priv->children, sibling) + 1;
-
-      priv->children = g_list_insert (priv->children, actor, pos);
-    }
-
-  /* set Z ordering a value below, this will then call sort
-   * as values are equal ordering shouldn't change but Z
-   * values will be correct.
-   *
-   * FIXME: optimise
-   */
-  if (sibling &&
-      clutter_actor_get_depth (sibling) != clutter_actor_get_depth (actor))
-    {
-      clutter_actor_set_depth (actor, clutter_actor_get_depth (sibling));
-    }
-
-  st_container_update_pseudo_classes (ST_CONTAINER (container));
-
-  if (CLUTTER_ACTOR_IS_VISIBLE (container))
-    clutter_actor_queue_redraw (CLUTTER_ACTOR (container));
+  clutter_actor_set_child_at_index (CLUTTER_ACTOR (container),
+                                    actor, pos);
 }
 
-static void
-st_container_lower (ClutterContainer *container,
-                    ClutterActor     *actor,
-                    ClutterActor     *sibling)
+void
+st_container_move_before (StContainer  *container,
+                          ClutterActor *actor,
+                          ClutterActor *sibling)
 {
-  StContainerPrivate *priv = ST_CONTAINER (container)->priv;
-
-  priv->children = g_list_remove (priv->children, actor);
-
-  /* Push to bottom */
-  if (!sibling)
-    {
-      GList *last_item;
-
-      last_item = g_list_first (priv->children);
-
-      if (last_item)
-        sibling = last_item->data;
-
-      priv->children = g_list_prepend (priv->children, actor);
-    }
-  else
-    {
-      gint pos;
-
-      pos = g_list_index (priv->children, sibling);
-
-      priv->children = g_list_insert (priv->children, actor, pos);
-    }
-
-  /* See comment in st_container_raise() for this */
-  if (sibling &&
-      clutter_actor_get_depth (sibling) != clutter_actor_get_depth (actor))
-    {
-      clutter_actor_set_depth (actor, clutter_actor_get_depth (sibling));
-    }
-
-  st_container_update_pseudo_classes (ST_CONTAINER (container));
-
-  if (CLUTTER_ACTOR_IS_VISIBLE (container))
-    clutter_actor_queue_redraw (CLUTTER_ACTOR (container));
-}
-
-static void
-st_container_sort_depth_order (ClutterContainer *container)
-{
-  StContainerPrivate *priv = ST_CONTAINER (container)->priv;
-
-  priv->children = g_list_sort (priv->children, sort_z_order);
-
-  if (CLUTTER_ACTOR_IS_VISIBLE (container))
-    clutter_actor_queue_redraw (CLUTTER_ACTOR (container));
-}
-
-static void
-st_container_dispose (GObject *object)
-{
-  StContainerPrivate *priv = ST_CONTAINER (object)->priv;
-
-  if (priv->children)
-    {
-      g_list_foreach (priv->children, (GFunc) clutter_actor_destroy, NULL);
-      g_list_free (priv->children);
-
-      priv->children = NULL;
-    }
-
-  if (priv->first_child)
-    g_object_unref (priv->first_child);
-  priv->first_child = NULL;
-
-  if (priv->last_child)
-    g_object_unref (priv->last_child);
-  priv->last_child = NULL;
-
-  G_OBJECT_CLASS (st_container_parent_class)->dispose (object);
-}
-
-static gboolean
-st_container_get_paint_volume (ClutterActor *actor,
-                               ClutterPaintVolume *volume)
-{
-  StContainerPrivate *priv = ST_CONTAINER (actor)->priv;
-  GList *l;
-
-  if (!CLUTTER_ACTOR_CLASS (st_container_parent_class)->get_paint_volume (actor, volume))
-    return FALSE;
-
-  if (!clutter_actor_get_clip_to_allocation (actor))
-    {
-      /* Based on ClutterGroup/ClutterBox; include the children's
-       * paint volumes, since they may paint outside our allocation.
-       */
-      for (l = priv->children; l != NULL; l = l->next)
-        {
-          ClutterActor *child = l->data;
-          const ClutterPaintVolume *child_volume;
-
-          child_volume = clutter_actor_get_transformed_paint_volume (child, actor);
-          if (!child_volume)
-            return FALSE;
-
-          clutter_paint_volume_union (volume, child_volume);
-        }
-    }
-
-  return TRUE;
+  clutter_actor_set_child_below_sibling (CLUTTER_ACTOR (container),
+                                         actor, sibling);
 }
 
 /* filter @children to contain only only actors that overlap @rbox
