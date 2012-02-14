@@ -19,7 +19,7 @@ let toggle = new St.Button({ label: 'Horizontal Scrolling',
                          toggle_mode: true });
 vbox.add(toggle);
 
-let v = new St.ScrollView();
+let v = new St.ScrollView({ style_class: 'vfade' });
 vbox.add(v, { expand: true });
 
 toggle.connect('notify::checked', function () {
