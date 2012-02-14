@@ -375,18 +375,15 @@ st_widget_allocate (ClutterActor          *actor,
                     const ClutterActorBox *box,
                     ClutterAllocationFlags flags)
 {
-  StWidget *self = ST_WIDGET (actor);
-  StWidgetPrivate *priv = self->priv;
-  ClutterActorClass *klass;
-  ClutterGeometry area;
-  ClutterVertex in_v, out_v;
-
-  klass = CLUTTER_ACTOR_CLASS (st_widget_parent_class);
-  klass->allocate (actor, box, flags);
+  StWidgetPrivate *priv = ST_WIDGET (actor)->priv;
+  StThemeNode *theme_node = st_widget_get_theme_node (ST_WIDGET (actor));
+  ClutterActorBox content_box;
 
   /* update tooltip position */
   if (priv->tooltip)
     {
+      ClutterGeometry area;
+      ClutterVertex in_v, out_v;
       in_v.x = in_v.y = in_v.z = 0;
       clutter_actor_apply_transform_to_point (actor, &in_v, &out_v);
       area.x = out_v.x;
@@ -400,6 +397,23 @@ st_widget_allocate (ClutterActor          *actor,
 
       st_tooltip_set_tip_area (priv->tooltip, &area);
     }
+
+  /* Note that we can't just chain up to clutter_actor_real_allocate --
+   * Clutter does some dirty tricks for backwards compatibility.
+   * Clutter also passes the actor's allocation directly to the layout
+   * manager, meaning that we can't modify it for children only.
+   */
+
+  clutter_actor_set_allocation (actor, box, flags);
+
+  st_theme_node_get_content_box (theme_node, box, &content_box);
+
+  /* If we've chained up to here, we want to allocate the children using the
+   * currently installed layout manager */
+  clutter_layout_manager_allocate (clutter_actor_get_layout_manager (actor),
+                                   CLUTTER_CONTAINER (actor),
+                                   &content_box,
+                                   flags);
 }
 
 /**
